@@ -6,7 +6,7 @@ import matplotlib.animation as animation
 import mpl_toolkits.mplot3d.axes3d as p3
 
 
-def vis_3d(visualize_gt):
+def vis_3d(visualize_gt, how_many_objects):
     fig = plt.figure()
     ax = p3.Axes3D(auto_add_to_figure=False, fig=fig)
     fig.add_axes(ax)
@@ -27,81 +27,14 @@ def vis_3d(visualize_gt):
         ax.set_zlabel('Y')  # change the label to y since y-axis values are given previously
         how_many_objs = 10
         olist = []
+        lendf = len(rdf)
+        if how_many_objects > 0 and lendf > 0:
+            t_tdf1 = rdf[0]
+            ax.scatter(t_tdf1[0, num], t_tdf1[1, num], t_tdf1[2, num], marker=".", color='b')
 
-        t_l1 = line2[0]
-        t_l2 = line2[1]
-        t_l3 = line2[2]
-        t_l4 = line2[3]
-        t_l5 = line2[4]
-        t_l6 = line2[5]
-        t_l7 = line2[6]
-        t_l8 = line2[7]
-        t_l9 = line2[8]
-        t_l10 = line2[9]
-
-        t_tdf1 = rdf[0]
-        t_tdf2 = rdf[1]
-        t_tdf3 = rdf[2]
-        t_tdf4 = rdf[3]
-        t_tdf5 = rdf[4]
-        t_tdf6 = rdf[5]
-        t_tdf7 = rdf[6]
-        t_tdf8 = rdf[7]
-        t_tdf9 = rdf[8]
-        t_tdf10 = rdf[9]
-        t_tdf11 = rdf[10]
-        t_tdf12 = rdf[11]
-        t_tdf13 = rdf[12]
-        t_tdf14 = rdf[13]
-        t_tdf15 = rdf[14]
-        t_tdf16 = rdf[15]
-        t_tdf17 = rdf[16]
-        t_tdf18 = rdf[17]
-        t_tdf19 = rdf[18]
-        t_tdf20 = rdf[19]
-
-        if num <= 5:
-            getvalue = 2
-        else:
-            getvalue = num - 2
-        v = t_tdf1[:, :num]
-        v2 = t_tdf2[2, :num]
-
-        # t_l1.set_data(t_tdf1[:, :num])
-        t_l2.set_data(t_tdf2[:2, :num])
-        t_l3.set_data(t_tdf3[:2, :num])
-        t_l4.set_data(t_tdf4[:2, :num])
-        t_l5.set_data(t_tdf5[:2, :num])
-        t_l6.set_data(t_tdf6[:2, :num])
-        t_l7.set_data(t_tdf7[:2, :num])
-        t_l8.set_data(t_tdf8[:2, :num])
-        t_l9.set_data(t_tdf9[:2, :num])
-        t_l10.set_data(t_tdf10[:2, :num])
-
-        fv = v.flatten()
 
         ax.scatter(0.0, 0.0, 0.0, marker="D")
         ax.scatter(2.0, 0.0, 0.0, marker="D")
-        ax.scatter(t_tdf1[0, num], t_tdf1[1, num], t_tdf1[2, num], marker=".", color='b')
-        ax.scatter(t_tdf2[0, num], t_tdf2[1, num], t_tdf2[2, num], marker=".", color='r')
-        ax.scatter(t_tdf3[0, num], t_tdf3[1, num], t_tdf3[2, num], marker=".", color='g')
-        ax.scatter(t_tdf4[0, num], t_tdf4[1, num], t_tdf4[2, num], marker=".", color='c')
-        ax.scatter(t_tdf5[0, num], t_tdf5[1, num], t_tdf5[2, num], marker=".", color='m')
-        ax.scatter(t_tdf6[0, num], t_tdf6[1, num], t_tdf6[2, num], marker=".", color='y')
-        ax.scatter(t_tdf7[0, num], t_tdf7[1, num], t_tdf7[2, num], marker=".", color='k')
-        ax.scatter(t_tdf8[0, num], t_tdf8[1, num], t_tdf8[2, num], marker=".", color='purple')
-        ax.scatter(t_tdf9[0, num], t_tdf9[1, num], t_tdf9[2, num], marker=".", color='orange')
-        ax.scatter(t_tdf10[0, num], t_tdf10[1, num], t_tdf10[2, num], marker=".", color='gray')
-        ax.scatter(t_tdf11[0, num], t_tdf11[1, num], t_tdf11[2, num], marker=".", color='gray')
-        ax.scatter(t_tdf12[0, num], t_tdf12[1, num], t_tdf12[2, num], marker=".", color='gray')
-        ax.scatter(t_tdf13[0, num], t_tdf13[1, num], t_tdf13[2, num], marker=".", color='gray')
-        ax.scatter(t_tdf14[0, num], t_tdf14[1, num], t_tdf14[2, num], marker=".", color='gray')
-        ax.scatter(t_tdf15[0, num], t_tdf15[1, num], t_tdf15[2, num], marker=".", color='gray')
-        ax.scatter(t_tdf16[0, num], t_tdf16[1, num], t_tdf16[2, num], marker=".", color='gray')
-        ax.scatter(t_tdf17[0, num], t_tdf17[1, num], t_tdf17[2, num], marker=".", color='gray')
-        ax.scatter(t_tdf18[0, num], t_tdf18[1, num], t_tdf18[2, num], marker=".", color='gray')
-        ax.scatter(t_tdf19[0, num], t_tdf19[1, num], t_tdf19[2, num], marker=".", color='gray')
-        ax.scatter(t_tdf20[0, num], t_tdf20[1, num], t_tdf12[2, num], marker=".", color='gray')
         # t_l1.set_3d_properties(v)
         # t_l2.set_3d_properties(t_tdf2[2, :num])
         # t_l3.set_3d_properties(t_tdf3[2, :num])
@@ -119,11 +52,11 @@ def vis_3d(visualize_gt):
     if visualize_gt:
         df_recon = pd.read_csv("gt_files/gt_3d_data_v1.csv")
     else:
-        df_recon = pd.read_csv("result_files/recon2.csv")
+        df_recon = pd.read_csv("result_files/reconstruction.csv")
     N = len(df_recon)
-
-    for i in range(20):
-        df_recon_2 = df_recon.loc[df_recon['oid'] == i]
+    unique_ids = df_recon.gtoid.unique()
+    for i in range(len(unique_ids)):
+        df_recon_2 = df_recon.loc[df_recon['gtoid'] == int(unique_ids[i])]
         df_recon_2 = df_recon_2[0:]
         dfnp = np.zeros((3, len(df_recon_2)))
         dfnp[0] = df_recon_2.iloc[0:]['x']

@@ -270,8 +270,19 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                             # There is a bug at opencv which causes z < 0 values
                             if z_2 > 0.0:
 
-                                if do_kalman_filter_predictions and i > 40:
-                                    x, y, z, k_cal_counter = kalman_functions.kalman_predict(pre_id_1, fn, "recon2", False)
+                                if do_kalman_filter_predictions and i > config.kf_frame_required * 2:
+                                    x, y, z, k_cal_counter = kalman_functions.kalman_predict(
+                                        pre_id_1, fn, "recon2", False)
+                                    if config.reverse_kf:
+                                        x2_kf, y2_kf, z2_kf, k_cal_counter2_kf = kalman_functions.kalman_predict(
+                                            pre_id_1, fn, "recon2", True)
+                                        if k_cal_counter > k_cal_counter2_kf:
+                                            pass
+                                        else:
+                                            x = x2_kf
+                                            y = y2_kf
+                                            z = z2_kf
+                                            k_cal_counter = k_cal_counter2_kf
                                     # print("x and y: " + str(x) + ", " + str(y))
                                     # 2D distance:
                                     # dist_2_points = sqrt((x - gtx) ** 2 + (y - gty) ** 2)
@@ -279,22 +290,23 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                                     forecast_point = [x, y, z]
                                     dist_2_points = distance.euclidean(s_point, forecast_point)
                                     epipolar_distance_check = False
-                                    if dist_2_points < 0.1:
+                                    if dist_2_points < config.kf_distance_threshold:
                                         write_result = True
                                         epipolar_distance_check = True
                                     else:
                                         if len(temp_c2) > 1:
                                             write_result = False
-                                            cont = False
-                                            ignore_candidate = False
+                                            cont = True
+                                            ignore_candidate = True
                                             candidate_id_to_ignore = pre_id_1
                                         else:
                                             # write_result = False
                                             cont = False
                                             ignore_candidate = False
-                                            if k_cal_counter == 0:
-                                                write_result = True
-                                    if 6 >= k_cal_counter and not epipolar_distance_check:
+                                            if k_cal_counter <= config.kf_frame_required:
+                                                # write_result = True
+                                                pass
+                                    if config.kf_frame_required >= k_cal_counter and not epipolar_distance_check:
                                         if abs(pre_min_1) < 50 and abs(pre_min_2) < 50:
                                             write_result = True
                                             ignore_candidate = False
@@ -302,13 +314,15 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                                         else:
                                             if len(temp_c2) > 1:
                                                 write_result = False
-                                                ignore_candidate = False
+                                                ignore_candidate = True
                                                 candidate_id_to_ignore = pre_id_1
-                                                cont = False
-                                if i <= 40:
+                                                cont = True
+                                if i <= config.kf_frame_required * 2:
                                     write_result = True
                                 if not do_kalman_filter_predictions:
                                     write_result = True
+                                if len(temp_c2) == 1:
+                                    cont = False
 
                                 if write_result and not ignore_candidate:
                                     df_recon = df_recon.append(
@@ -332,7 +346,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                                         fcounter += 1
                                     ccount += 1
 
-                                if do_kalman_filter_predictions:
+                                if do_kalman_filter_predictions and not config.multi_run:
                                     df_recon.to_csv(f"result_files/{result_file_name}.csv", index=False)
                                 if call_kalman_fill:
                                     kalman_functions.kalman_fill("recon1", 10, i)
@@ -1222,14 +1236,14 @@ def find_best_pair_of_cameras(camera_df, gt_3d_df):
         if fail_counter < best_c2:
             if fail_counter < best_c1:
                 best_c1 = fail_counter
-                best_c1_id = c1.id
+                best_c1_id = camera_df.iloc[i]['did']
             else:
                 best_c2 = fail_counter
-                best_c2_id = c1.id
+                best_c2_id = camera_df.iloc[i]['did']
         if fail_counter <= 0:
-            print("Working camera id: " + str(c1.id))
+            print("Working camera id: " + str(camera_df.iloc[i]['did']))
         else:
-            print("Failed camera id: " + str(c1.id))
+            print("Failed camera id: " + str(camera_df.iloc[i]['did']))
     print("Found: " + str(best_c1_id) + ", " + str(best_c2_id))
     print("")
 
@@ -1261,12 +1275,14 @@ if __name__ == '__main__':
     starling_df, starling_r1 = data_functions.read_starling_data_file("ST01a.vsk")
 
     gt_3d_df = starling_df
-    # On perch
-    # found_camera_df = camera_df.loc[(camera_df['did'] == 2121154) | (camera_df['did'] == 2121162)]
-    # 6 & 29
-    # found_camera_df = camera_df.loc[(camera_df['did'] == 2121115) | (camera_df['did'] == 2122204)]
-    # 5 & 16
-    found_camera_df = camera_df.loc[(camera_df['did'] == 2121113) | (camera_df['did'] == 2121156)]
+    # ST06, 07, 08
+    # found_camera_df = camera_df.loc[(camera_df['did'] == 2121154) | (camera_df['did'] == 2121113)]
+    # ST01, 02, 03
+    # found_camera_df = camera_df.loc[(camera_df['did'] == 2121156) | (camera_df['did'] == 2122725)]
+    # ST09, 10, 11
+    # found_camera_df = camera_df.loc[(camera_df['did'] == 2121113) | (camera_df['did'] == 2121156)]
+    # ST 12a, 13b, 14b (Starling_Trials_07-12-2019_11-15-00RESULT)
+    found_camera_df = camera_df.loc[(camera_df['did'] == 2121113) | (camera_df['did'] == 2121154)]
 
     # Fundamental matrix calculation
     # fmatrix = calcFundamentalMatrix(camera_1, camera_2)
@@ -1275,10 +1291,12 @@ if __name__ == '__main__':
     # find_best_pair_of_cameras(camera_df, gt_3d_df)
     if r1 and do_estimations:
         # Get projection dataframes.
-        # _, _ = project_to_2d_and_3d(gt_3d_df, camera_1, mu=0.0, sigma=0.0, mu3d=0, sigma3d=0)
-        # _, _ = project_to_2d_and_3d(gt_3d_df, camera_2, mu=0.0, sigma=0.0, mu3d=0, sigma3d=0)
-        _, _ = data_functions.project_to_2d_and_3d(gt_3d_df, create_camera(found_camera_df, 0), mu=0.0, sigma=0.0, mu3d=0, sigma3d=0)
-        _, _ = data_functions.project_to_2d_and_3d(gt_3d_df, create_camera(found_camera_df, 1), mu=0.0, sigma=0.0, mu3d=0, sigma3d=0)
+        # _, _ = data_functions.project_to_2d_and_3d(gt_3d_df, camera_1, mu=0.0, sigma=0.0, mu3d=0, sigma3d=0)
+        # _, _ = data_functions.project_to_2d_and_3d(gt_3d_df, camera_2, mu=0.0, sigma=0.0, mu3d=0, sigma3d=0)
+        _, _ = data_functions.project_to_2d_and_3d(gt_3d_df, create_camera(found_camera_df, 0),
+                                                   mu=0.0, sigma=0.0, mu3d=0, sigma3d=0)
+        _, _ = data_functions.project_to_2d_and_3d(gt_3d_df, create_camera(found_camera_df, 1),
+                                                   mu=0.0, sigma=0.0, mu3d=0, sigma3d=0)
         object_2d_df, r2 = data_functions.read_data_file("proj_2d")
         if gt_construction and r2:
             reconstruct_trajectories(create_camera(found_camera_df, 0), create_camera(found_camera_df, 1),
@@ -1298,8 +1316,8 @@ if __name__ == '__main__':
     # compare_2d_tra_to_gt(0, 0, create_camera(found_camera_df, 0), "trajectories2d")
     # compare_2d_tra_to_gt(1, 1, create_camera(found_camera_df, 0), "trajectories2d")
 
-    if visualizations:
-        visualizations.vis_3d(True)
+    if visualization:
+        visualizations.vis_3d(False, 1)
         # visualizations.vis_2d_tid(False, "tids", camera_1, 0, 2)
         # visualizations.vis_2d(False, "out_tr1d", camera_1, False)
         # visualizations.vis_2d(True, "gt_tr1d", camera_1, False)

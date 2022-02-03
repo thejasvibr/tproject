@@ -16,7 +16,7 @@ def read_starling_data_file(file_name):
     all_filenames = [i for i in glob.glob('sgt_files/*.{}'.format(extension))]
     print(all_filenames)
     combined_csv = pd.concat([pd.read_csv(f) for f in all_filenames])
-    combined_csv.to_csv("result_files/combined_csv.csv", index=False, encoding='utf-8-sig')
+    # combined_csv.to_csv("result_files/combined_csv.csv", index=False, encoding='utf-8-sig')
 
     if True:
         # csv_to_df_pre = pd.read_csv(path_to_check)
@@ -37,6 +37,7 @@ def read_starling_data_file(file_name):
         data_to_transfer['z'] = data_to_transfer['z'].astype('float64').div(1000)
 
         csv_to_df = data_to_transfer
+        csv_to_df.to_csv("result_files/combined_csv.csv", index=False, encoding='utf-8-sig')
         return csv_to_df, True
     else:
         print("File cannot be found.")

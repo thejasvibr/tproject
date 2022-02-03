@@ -7,7 +7,6 @@ import cv2
 import math
 
 
-
 def kalman_fill(file_name, frame_window, how_many_frames):
     path_to_check_1 = Path(f"result_files/{file_name}.csv")
     if path_to_check_1.exists():
@@ -247,7 +246,7 @@ def kalman_predict(obj_id, frame_number, file_name, reverse_flag):
             kalman_z.statePost = 0.1 * np.random.randn(2, 1)
             kalman_z.statePost = state_value_z  # x^_k|k  KF state var
 
-            counter = frame_number - 10
+            counter = frame_number - config.kf_frame_required * 2
             cal_counter = 0
 
             while counter < frame_number - 1 and len(df_t) > 0:
@@ -289,7 +288,7 @@ def kalman_predict(obj_id, frame_number, file_name, reverse_flag):
 
                 else:
                     counter += 1
-                    if cal_counter > 6:
+                    if cal_counter >= config.kf_frame_required:
                         mt = np.squeeze(np.asarray(v1))
                         if counter == frame_number - 1:
                             if mt.size > 1:
