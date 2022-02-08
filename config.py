@@ -6,8 +6,8 @@ create_objects = False
 do_estimations = True
 do_kalman_filter_predictions = True
 gt_construction = False
-multi_run = False
-reverse_kf = False
+multi_run = False # will write onto an existing result file
+reverse_kf = False # requires an existing result file!
 kf_distance_threshold = 0.3  # meters.
 # Amount of data required from previous frames for kalman forecast to be evaluated as a threshold.
 kf_frame_required = 5

@@ -205,6 +205,30 @@ def kalman_pair(file_name, gt_file_name, camera_obj):
 
 def kalman_predict(obj_id, frame_number, file_name, reverse_flag):
     '''
+    Checks previous xyz positions of points and uses it to predict the next point.
+    Also takes a reverse flag -- which works only if there is a pre-existing result
+    file.
+
+    Parameters
+    ----------
+    obj_id : int
+        Object ID
+    frame_number : int
+        Frame number
+    file_name : str
+        REsult file name. Expected to be in the 'result_files/' folder. 
+    reverse_flag :  bool
+        Set to True only if there is already a result file.
+        
+    Returns
+    -------
+    4 outputs in the order: x,y,z, number of frames used to predict
+    If output is -1 then it means there is not sufficient data.
+
+    TODO
+    ----
+    The Kalman filter parameters need to be tweaked - or also set to a variable 
+    instead of the currently hard-coded values.
     '''
     # print("at kalman_predict")
     path_to_check_1 = Path(f"result_files/{file_name}.csv")

@@ -246,8 +246,6 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
     fcounter = 0 # failed pairings  
     ccount = 0 # Sum total of all points across all frames in Camera 1
     avg_ee = 0 
-    # find_trajectory does not have a purpose here (TB) - needs to be checked.
-    #find_trajectory(0, [0, 0, 0], True, 0) # this line could be deleted?? -- need to run a test here.
 
     outfm = fm_1
     # _, _, pm2, pm3, _ = cv2.stereoRectify(camera1.cm_mtrx, camera1.cof_mtrx, camera2.cm_mtrx, camera2.cof_mtrx,
@@ -261,7 +259,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
         at_frame_c2 = df_t_2.loc[df_t_2['frame'] == fn]
 
         at_frame_c1 = df_t.loc[df_t['frame'] == fn]
-        check_if = int(i % (run_len / 100.0 * 1.0))
+        check_if = int(i % (run_len / 100.0 * 1.0)) # progress bar
         call_kalman_fill = False
         if check_if == 0:
             print("Estimating progress: " + str(int(i / run_len * 100)) + "%")
@@ -273,7 +271,8 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                 call_kalman_fill = False
         if not at_frame_c2.empty and not at_frame_c1.empty:
 
-            cont = True
+            cont = True # continue flag - becomes False after correspondence checks with all 
+            # available pionts in frames are done
             temp_c2 = at_frame_c2.copy()
 
             # p1 = numpy.float64([cand1[0][0][0], cand1[0][0][1], 1])
@@ -297,10 +296,14 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                     temp_c1 = at_frame_c1.copy()
 
                     cp1 = np.float32([cand_p_1[0], cand_p_1[1]])
+                    # the 'two-way authentication' is done here. The epipolar of the 'best point' in Cam 2 is 
+                    # is the projected onto Cam 1 - and the point closest to this epipolar is checked.
                     cand_p_2, pre_min_2, pre_frame_2, pre_id_2, row_num1 = find_candidate(temp_c1, outfm, camera1,
                                                                                           camera2, cp1, 20, 2000, False)
 
                     if len(cand_p_2) != 0:
+                        # check that the '2-way auth' point on Cam1 is the same as the original 
+                        # candidate point
                         if (np.isclose(temp_p[0], cand_p_2[0], atol=0.0001) and
                                 np.isclose(temp_p[1], cand_p_2[1], atol=0.0001)):
                             # print("Successful match")
@@ -313,7 +316,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                             x_2 = tri_res[0] / tri_res[3]
                             y_2 = tri_res[1] / tri_res[3]
                             z_2 = tri_res[2] / tri_res[3]
-                            # Get benchmark rotate3D value.
+                            # Get groun truth 3D value.
                             oid_f = df_t.iloc[i]['oid']
                             t1 = df_t.iloc[i]['frame']
                             t2 = df_3d_gt.loc[np.float32(df_3d_gt['frame']) == np.float32(t1)]
@@ -322,7 +325,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                             xf = x_2
                             yf = y_2
                             zf = z_2
-                            s_point = [x_2, y_2, z_2]
+                            s_point = [x_2, y_2, z_2] # estimated xyz position
 
                             gtx = t4.iloc[0]['x']
                             gty = t4.iloc[0]['y']
@@ -333,7 +336,11 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                             cont = False
                             write_result = False
                             k_cal_counter = -1
-                            # There is a bug at opencv which causes z < 0 values
+                            # There is a bug at opencv which outputs z < 0 values
+                            # https://github.com/HKUST-Aerial-Robotics/VINS-Mono/issues/173
+                            # ALSO
+                            # https://stackoverflow.com/q/66268893/4955732
+                            # Giray suspects this clause could be deleted.
                             if z_2 > 0.0:
 
                                 if do_kalman_filter_predictions and i > config.kf_frame_required * 2:
@@ -605,6 +612,47 @@ def match_2d_trajectories(camera1: classes.Camera, camera2: classes.Camera, file
 
 def find_candidate(df_2d_c1, fund_matrix, camera1: classes.Camera, camera2: classes.Camera, candidate_point,
                    known_depth_for_camera, threshold, rec):
+    '''
+    Gives the 2D point closest to the epipolar line projected from the reference camera.
+
+    Parameters
+    ----------
+    df_2d_c1 : pd.DataFrame
+        xy coordinates for on the camera 'reference' camera  (assigned to number 1)
+    fund_matrix: np.array
+        Fundamental matrix. 
+    camera1, camera2 : classes.Camera instances
+    candidate_point :  np.array (np.float32)
+    known_depth_for_camera : float >0 
+        Not used any more in the latest implementation -- but 'works'
+    threshold : float 
+        Not used any more in the latest implementation -- but 'works'
+    rec : bool
+        True/False - not used any more -- but 'works'
+        Should ALWAYS BE FALSE!!!!!!!!!!!!!!!!!!!!!!!
+    
+    Returns 
+    -------
+    pre_p : np.array
+        x,y coordinates of the point with min distance to epipolar line on the 
+        other camera
+    pre_min : float
+        The perpendicular Euclidean distance of the best match to the epipolar line
+    pre_frame : int 
+        Frame number. This is here more for diagnostic reasons as the pre_frame should 
+        match the same frame number as df_2d_c1
+    pre_id : int
+        Object id of the best point in the 'other' camera 
+    row_num : int 
+        The row number of the best matchign point in df_2d_c1. This too is here more 
+        for diagnostic reasons.
+        
+    See Also
+    --------
+    calcFundamentalMatrix
+    
+    
+    '''
     run_len = len(df_2d_c1)
     pre_min = math.inf
     x_cand, y_cand, pre_frame, pre_id = -1, -1, -1, -1
@@ -618,46 +666,7 @@ def find_candidate(df_2d_c1, fund_matrix, camera1: classes.Camera, camera2: clas
                                                        P=camera2.i_mtrx)
         else:
             return [], -1, -1, -1, -1
-        '''
-        # Calculate a far point.
-        est_3d_point_temp = np.matmul(camera1.r_mtrx, temp_p2)
-        est_3d_point = np.add(est_3d_point_temp, camera1.t_mtrx)
-        '''
 
-        '''
-        # Old methodology with known depth:
-        # Reproject 2d to 3d with known depth
-        z = 1.309  # gt_3d_point[2] for case check
-        x = ((points_undistorted_2[0][0][0] - camera2.c_x) / camera2.f_x * z)
-        y = ((points_undistorted_2[0][0][1] - camera2.c_y) / camera2.f_y * z)
-        est_3d_point = np.float32([x, y, z])
-        # This estimation should be converted to real world with the cameras' perspectives.
-        tback = est_3d_point - camera2.t_mtrx
-        # Swapping cameras since they are reverse of each other. Should be fixed though.
-        rback = tback @ camera1.r_mtrx
-
-        inverse_rotation = np.linalg.inv(camera_2.r_mtrx)
-
-        rback = tback @ inverse_rotation
-
-        # Project estimated 3D point to Camera 1
-        rvec_1, _ = cv2.Rodrigues(camera1.r_mtrx)
-        oi, _ = cv2.projectPoints(rback, rvec_1, camera1.t_mtrx, camera1.i_mtrx, camera1.cof_mtrx)
-
-        # Calculate epipolar points.
-        oi_3, _ = cv2.projectPoints(camera2.rel_pos, rvec_1, camera1.t_mtrx, camera1.i_mtrx, camera1.cof_mtrx)
-
-        # Assign values to their new shape
-        xls_1_k = oi[0][0][0]
-        yls_1_k = oi[0][0][1]
-        xls_2_k = oi_3[0][0][0]
-        yls_2_k = oi_3[0][0][1]
-
-        # Old distance threshold value
-        # extended_p1_2 = np.float32([xls_1_k, yls_1_k])
-        # extended_p2_2 = np.float32([xls_2_k, yls_2_k])
-        # dist_2d_2 = calc_dist_2d_line_to_point(extended_p1_2, extended_p2_2, temp_p)
-        '''
 
         # Set camera ids for computeCorrespondEpilines()
         if camera1.id < camera2.id:
