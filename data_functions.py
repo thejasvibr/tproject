@@ -10,6 +10,27 @@ import classes
 
 
 def read_starling_data_file(file_name):
+    '''
+    Reads the custom format of the starling dataset and formats it into the 
+    normal groundtruth data.
+    
+    Parameters
+    ----------
+    file_name : str
+        File name template that is expected to be multiple csv files in the sgt_files folder of 
+        the working directory
+    
+    Returns 
+    -------
+    csv_to_df : pd.DataFrame 
+    True/False : loading success
+    
+    Side Effects
+    ------------
+    writes 'result_files/combined_csv.csv' - which has the 3D trajectories of points
+    from the starling data. 
+    
+    '''
     path_to_check = Path(f"sgt_files/{file_name}.csv")
 
     extension = 'csv'
@@ -45,6 +66,27 @@ def read_starling_data_file(file_name):
 
 
 def create_data_3d_object_data_2(how_many, fps, how_long_seconds):
+    '''
+    Creates 3D trajectories for later 2D projection. Brownian-type motion 
+    within a 3D box
+    
+    Parameters
+    ----------
+    how_many : int >0 
+        NUmber of synthetic particles
+    fps : int >0 
+        Frames per second
+    how_long_seconds : float>0
+        Duration of the synthetic 'recording'
+
+    Side effects
+    ------------
+    Outputs all the  groundtruth (gt) 3D trajectories to 'gt_files/gt_3d_data_v1.csv'
+    The dataframe has 
+        frame
+        oid : object id
+        x,y,z : position 
+    '''
     object_3d_df = pd.DataFrame(
         columns=[
             "frame", "oid", "x", "y", "z"
@@ -138,6 +180,17 @@ def gt_data_to_csv(df_to_csv, what_to_do, file_name):
 
 
 def read_data_file(file_name):
+    '''
+    Parameters
+    ----------
+    file_name : str,path
+        expects the file to be in 'gt_files' folder within the working 
+        directory
+    Returns
+    -------
+    csv_to_df : pd.DataFrame
+    True/False : success indicator
+    '''
     path_to_check = Path(f"gt_files/{file_name}.csv")
 
     if path_to_check.exists():
@@ -149,6 +202,51 @@ def read_data_file(file_name):
 
 
 def project_to_2d_and_3d(gt_3d_df, camera_obj: classes.Camera, mu, sigma, mu3d, sigma3d):
+    '''
+    Projects 2D points from the input 3D trajectories while also adding noise. 
+    Two types of noise are implemented (both can be also used). Pre-projection noise
+    adds 3D noise to the xyz coordinates, and post-projection nosie adds 2D noise 
+    to the pixel coordinates. 
+    
+    The projection is always expected to be within 1920 x 1080 pixels
+    
+    Parameters
+    ----------
+    gt_3d_df : pd.DataFrame 
+        With 3D trajectory information and columns frame, oid, cid and x,y,z
+    camera_obj : classes.Camera instance
+    mu : float
+        2D noise mean (noise post projection)
+    sigma : float
+        2D noise standard deviation (post projection)
+    mu3d : float
+        3D noise mean pre-projection 
+    sigma3D : float
+        3D noise standard deviation pre-projection
+    
+    Returns
+    -------
+    proj_2d_df : pd.DataFrame
+        2D projection dataframe with columns:
+            frame
+            oid (object id)
+            cid (camera id)
+            x : column number (increases to the right)
+            y : the row number (increases as you move down the image)
+
+    fail_counter : int
+        Number of positions that can't be projected onto the 2D image.
+
+    Side effect
+    -----------
+    Writes the 2D projections as 'gt_files/proj_2d.csv'
+    
+    Attention
+    ---------
+    if a 2D projection file is already there (as gt_files/proj_2d.csv), then 
+    unless force_calculation is True - the old file is used. 
+    
+    '''
     proj_2d_df = pd.DataFrame(columns=["frame", "oid", "cid", "x", "y"])
     path_to_check_1 = Path("gt_files/proj_2d.csv")
     oid = -1

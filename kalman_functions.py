@@ -8,6 +8,9 @@ import math
 
 
 def kalman_fill(file_name, frame_window, how_many_frames):
+    '''
+    Not used in the final implementation
+    '''
     path_to_check_1 = Path(f"result_files/{file_name}.csv")
     if path_to_check_1.exists():
         df_matched = pd.read_csv(path_to_check_1)
@@ -126,6 +129,9 @@ def kalman_fill(file_name, frame_window, how_many_frames):
 
 
 def kalman_pair(file_name, gt_file_name, camera_obj):
+    '''
+    Not used in the final implementation
+    '''
     path_to_check_1 = Path(f"result_files/{file_name}.csv")
     path_to_check_2 = Path(f"gt_files/{gt_file_name}.csv")
     if path_to_check_1.exists() and path_to_check_2.exists():
@@ -198,6 +204,8 @@ def kalman_pair(file_name, gt_file_name, camera_obj):
 
 
 def kalman_predict(obj_id, frame_number, file_name, reverse_flag):
+    '''
+    '''
     # print("at kalman_predict")
     path_to_check_1 = Path(f"result_files/{file_name}.csv")
     if path_to_check_1.exists():

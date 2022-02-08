@@ -67,9 +67,23 @@ def calc_distance_point_line(p, q, r):
     return d(p, q, r)
 
 
-# For details please check page 246 "Multiple View Geometry".
-# Used formula F = [e']_x * P' * p^+
+
 def calcFundamentalMatrix(camera_1_o, camera_2_o):
+    '''
+    Parameters
+    ----------
+    camera_1_o, camera_2_o : classes.Camera instances 
+    
+    Returns
+    -------
+    second : np.array 
+        2D array with the fundamental matrix
+
+    Notes
+    -----
+    For details please check page 246 "Multiple View Geometry".
+    Used formula F = [e']_x * P' * p^+
+    '''
     rt = camera_1_o.r_mtrx.transpose()
     rt = np.negative(rt)
     cpos = np.matmul(rt, camera_1_o.t_mtrx)
@@ -169,19 +183,71 @@ def project_to_2d_and_3d_no_id(gt_3d_df, camera_1: classes.Camera, camera_2: cla
 
 
 def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, fm_1):
+    '''
+    Receives 2D projections from 2 cameras. Does epipolar matching, and after 10 
+    frames applies Kalman Filtering, and gets robust pairing. 
+    
+    Does not assume that camera 1 and camera 2 have the same parameters. 
+
+    Parameters
+    ----------
+    camera1 : classes.Camera
+    camera2 : classes.Camera
+    df_2d : pd.DataFrame
+        2D projections of objects
+    df_3d_gt : pd.DataFrame
+        Groundtruth 3D data. For comparison of the matched trajectories and 
+        the groundtruth.
+    result_file_name : str
+        Final file name that the results will be saved in. 
+    fm_1 : np.array
+        Fundamental matrix for camera 1
+
+    Returns 
+    -------
+    avg_ee : float
+        Average estimation error in metres
+    -1 : int
+        Significance of the value unclear (says Giray)
+    
+    Side effects
+    ------------
+    Write 'result_files/{result_file_name}.csv' with columns:
+        frame : frame number
+        oid_1, oid_2 : object id in camera 1 and camera 2
+        x,y,z : estimated xyz position
+        dt1 : distance between nearest point and Camera 1 epipolar line projected onto Camera 2 in pixels
+        dt2 : nearest point to epipolar line back projected onto camera 1 from the point that gave dt1 in pixels (the 'two-way authenticated point')
+        dt3 : distance between Kalman fileter prediction for that point and the estimated xyz in metres.
+              The value is -1 if there is not enough data to predict.
+        gtx, gty, gtz : ground truth xyz coordinates
+        ee : estimation error in metres for each point and frame 
+        kcounter : kalman filter counter. Counts how many frames of data were available 
+
+    TODO
+    ----
+    * During pairing, it's important to write a separate function which 
+    checks that object ids are consistently matched - ideally after the recon2 output is created
+    
+    References 
+    ----------
+    * Giray's Master Thesis
+    '''
     df_2d = df_2d.sort_values('frame')
-    df_t = df_2d.loc[df_2d['cid'] == camera1.id]
-    df_t_2 = df_2d.loc[df_2d['cid'] == camera2.id]
+    df_t = df_2d.loc[df_2d['cid'] == camera1.id] # trajectories cam 1
+    df_t_2 = df_2d.loc[df_2d['cid'] == camera2.id] #trajectores cam 2
 
     run_len = len(df_t)  # Number of frames.
 
     # Benchmark values
+    # see Sections 3.2-3.3 in Giray's thesis for more background
     df_recon = pd.DataFrame(columns=["frame", "gtoid", "oid_1", "oid_2", "x", "y", "z", "dt1", "dt2", "dt3"])
-    scounter = 0
-    fcounter = 0
-    ccount = 0
-    avg_ee = 0
-    find_trajectory(0, [0, 0, 0], True, 0)
+    scounter = 0 # successful pairings
+    fcounter = 0 # failed pairings  
+    ccount = 0 # Sum total of all points across all frames in Camera 1
+    avg_ee = 0 
+    # find_trajectory does not have a purpose here (TB) - needs to be checked.
+    #find_trajectory(0, [0, 0, 0], True, 0) # this line could be deleted?? -- need to run a test here.
 
     outfm = fm_1
     # _, _, pm2, pm3, _ = cv2.stereoRectify(camera1.cm_mtrx, camera1.cof_mtrx, camera2.cm_mtrx, camera2.cof_mtrx,
@@ -1042,6 +1108,26 @@ def distance_to_line(p1, p2, self):
 
 
 def run_setup():
+    '''
+    Generates synthetic cameras and points. 
+    Two cameras are generated with hard-coded parameters. When points are generated, 
+    they will always be in FOV of both cameras (unless there's a lot of 3D noise.).
+    
+    
+    Parameters
+    ----------
+    None 
+    
+    Returns 
+    -------
+    camera1, camera2, camera3 : Camera instances
+    
+    
+    See Also 
+    --------
+    classes.Camera
+    
+    '''
     # Camera setup:
     f = 1230
     c_x = 960.
@@ -1144,6 +1230,25 @@ def run_setup():
 
 
 def run_setup_starling():
+    '''
+    Parameters
+    ----------
+    None
+    But - hard coded are 1) .xcp camera parameters file and 2) the unit conversion from 
+    mm to m (/1000)
+    
+    Returns
+    -------
+    camera_df : pd.DataFrame
+        With columns : 
+            did : device id
+            focal_length
+            o1,o2,o3,o4 : orientations of camera
+            x,y,z 
+            ppx,ppy,ppz : principal point x,y,z
+            coe1-5 : distortion coeffieicnts
+    '''
+
     # Camera setups
     xmldoc = minidom.parse('gt_files/cameras_starling.xcp')
     itemlist = xmldoc.getElementsByTagName('Camera')
@@ -1189,6 +1294,20 @@ def run_setup_starling():
 
 
 def create_camera(camera_df, index):
+    '''
+    Creates camera instances from a dataframe.
+    
+    Parameters
+    ----------
+    camera_df : pd.DataFrame 
+        with columns of focal_length, ppx, ppy, etc. 
+    index : int 
+        Camera number 
+    
+    Returns 
+    -------
+    camera_1 : classes.Camera instance
+    '''
     # Camera setup:
     f = camera_df.iloc[index]['focal_length']
     c_x = camera_df.iloc[index]['ppx']
@@ -1264,10 +1383,7 @@ if __name__ == '__main__':
     # kalman_pair("recon2", "proj_2d", camera_2)
 
     if force_calc and create_objects:
-        '''
-        for i in range(how_many_objects_to_create):
-            create_data_3d_object_data(i)
-        '''
+        # Creates a csv file with 3D ground truth trajectories
         data_functions.create_data_3d_object_data_2(how_many_objects_to_create, 30, 20)
         pass
 
@@ -1285,7 +1401,8 @@ if __name__ == '__main__':
     found_camera_df = camera_df.loc[(camera_df['did'] == 2121113) | (camera_df['did'] == 2121154)]
 
     # Fundamental matrix calculation
-    # fmatrix = calcFundamentalMatrix(camera_1, camera_2)
+    # fmatrix = calcFundamentalMatrix(camera_1, camera_2) # for synthetic data
+    # for the startling data (below)
     fmatrix = calcFundamentalMatrix(create_camera(found_camera_df, 0), create_camera(found_camera_df, 1))
 
     # find_best_pair_of_cameras(camera_df, gt_3d_df)

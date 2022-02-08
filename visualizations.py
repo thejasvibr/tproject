@@ -1,3 +1,7 @@
+'''
+Not commented because it's not directly relevant to the real functionality of the
+code base.
+'''
 import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
