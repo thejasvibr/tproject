@@ -1,3 +1,10 @@
+'''
+
+Deleted functions in the latest commit:
+    
+    kalman_fill
+
+'''
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -5,203 +12,6 @@ import classes
 import config
 import cv2
 import math
-
-
-def kalman_fill(file_name, frame_window, how_many_frames):
-    '''
-    Not used in the final implementation
-    '''
-    path_to_check_1 = Path(f"result_files/{file_name}.csv")
-    if path_to_check_1.exists():
-        df_matched = pd.read_csv(path_to_check_1)
-
-        counter = 0
-
-        unique_ids = df_matched["gtoid"].unique()
-        unique_ids.sort()
-        print(unique_ids)
-        for id in unique_ids:
-
-            object_data = df_matched.loc[df_matched["oid_1"].astype(int) == int(id)]
-
-            # how_many_frames = len(object_data)
-            # print(how_many_frames)
-            first_frame_num = object_data.iloc[0]["frame"].astype(int)
-            # last_frame_num = object_data.iloc[how_many_frames - 1]["frame"].astype(int)
-            diff_frame = len(object_data)
-
-            if how_many_frames != diff_frame:
-                print("Not complete object with id: " + str(id))
-                temp_frame_value = object_data.iloc[0]["frame"].astype(int)
-                for z in range(1, frame_window):
-                    frame_value = object_data.iloc[z]["frame"].astype(int)
-                    if (frame_value - temp_frame_value) != 1:
-                        df_matched = df_matched.append(
-                            pd.DataFrame(
-                                {"frame": temp_frame_value + 1, "gtoid": object_data.iloc[z]['gtoid'],
-                                 "oid_1": object_data.iloc[z]['oid_1'],
-                                 "oid_2": object_data.iloc[z]['oid_2'],
-                                 "x": object_data.iloc[z]['x'], "y": object_data.iloc[z]['y'],
-                                 "z": object_data.iloc[z]['z'], "gtx": object_data.iloc[z]['gtx'],
-                                 "gty": object_data.iloc[z]['gty'], "gtz": object_data.iloc[z]['gtz'], "ee": 0.0,
-                                 "dt1": object_data.iloc[z]['dt1'], "dt2": object_data.iloc[z]['dt2'],
-                                 "dt3": object_data.iloc[z]['dt3']}, index=[0]))
-                    else:
-                        temp_frame_value = frame_value
-
-                # TODO 2: fill rest of the frames
-                temp_estimation = config.error_code
-                update_counter = 0
-
-                KFx = classes.KalmanFilter(0.1, 1, 1, 1, 0.1, 0.1)
-                KFy = classes.KalmanFilter(0.1, 1, 1, 1, 0.1, 0.1)
-                KFz = classes.KalmanFilter(0.1, 1, 1, 1, 0.1, 0.1)
-                run_len = len(object_data)
-                if run_len > 181:
-                    start = run_len - 181
-                else:
-                    start = 0
-                temp_frame_value = object_data.iloc[start]["frame"].astype(int) - 1
-                for k in range(start, run_len):
-                    # Predict
-                    (xv, t4) = KFx.predict()
-                    (yv, t5) = KFy.predict()
-                    (zv, t6) = KFz.predict()
-
-                    frame_value = object_data.iloc[k]["frame"].astype(int)
-
-                    # Update
-                    row = object_data.loc[object_data['frame'].astype(float) == float(frame_value)]
-                    if len(row) > 0:
-                        txv = row.iloc[0]['x'].astype(float)
-                        tyv = row.iloc[0]['y'].astype(float)
-                        tzv = row.iloc[0]['z'].astype(float)
-
-                        (x1, t1) = KFx.update((txv, tyv))
-                        (y1, t2) = KFy.update((tyv, tzv))
-                        (z1, t3) = KFz.update((tzv, txv))
-                        update_counter += 1
-                    if (frame_value - temp_frame_value) != 1:
-                        # TODO: Assign estimated values and calculate estimation error for estimated value.
-                        missing_frames = frame_value - temp_frame_value
-
-                        for t in range(1, missing_frames - 1):
-                            print("xv:" + str(xv) + ", gtxv: " + str(row.iloc[0]['x']) + ", update_counter: " +
-                                  str(update_counter) + " frame: " + str(temp_frame_value + t))
-                            mt1 = np.squeeze(np.asarray(xv))
-                            mt2 = np.squeeze(np.asarray(yv))
-                            mt3 = np.squeeze(np.asarray(zv))
-                            mt1 = mt1.tolist()
-                            mt2 = mt2.tolist()
-                            mt3 = mt3.tolist()
-                            if len(mt1) > 1 and len(mt2) > 1 and len(mt3) > 1:
-                                mt2 = mt2[0]
-                                mt1 = mt1[0]
-                                mt3 = mt3[0]
-                                df_matched = df_matched.append(
-                                    pd.DataFrame(
-                                        {"frame": temp_frame_value + t, "gtoid": object_data.iloc[k]['gtoid'],
-                                         "oid_1": object_data.iloc[k]['oid_1'],
-                                         "oid_2": object_data.iloc[k]['oid_2'],
-                                         "x": mt1, "y": mt2,
-                                         "z": mt3, "gtx": object_data.iloc[k]['gtx'],
-                                         "gty": object_data.iloc[k]['gty'], "gtz": object_data.iloc[k]['gtz'],
-                                         "ee": 0.0,
-                                         "dt1": object_data.iloc[k]['dt1'], "dt2": object_data.iloc[k]['dt2'],
-                                         "dt3": object_data.iloc[k]['dt3']}, index=[0]))
-
-                                # Predict
-                                (xv, t4) = KFx.predict()
-                                (yv, t5) = KFy.predict()
-                                (zv, t6) = KFz.predict()
-
-                                (x1, t1) = KFx.update((mt1, mt2))
-                                (y1, t2) = KFy.update((mt2, mt3))
-                                (z1, t3) = KFz.update((mt3, mt1))
-
-                    temp_frame_value = frame_value
-
-            else:
-                print("Complete object with id: " + str(id))
-
-        df_matched = df_matched.sort_values(by=['frame', 'gtoid'], ascending=[True, True])
-        df_matched.to_csv(f"result_files/recon1.csv", index=False)
-
-
-def kalman_pair(file_name, gt_file_name, camera_obj):
-    '''
-    Not used in the final implementation
-    '''
-    path_to_check_1 = Path(f"result_files/{file_name}.csv")
-    path_to_check_2 = Path(f"gt_files/{gt_file_name}.csv")
-    if path_to_check_1.exists() and path_to_check_2.exists():
-        df_matched = pd.read_csv(path_to_check_1)
-        df_gt_2d = pd.read_csv(path_to_check_2)
-        unique_ids = df_gt_2d["oid"].unique()
-        unique_ids.sort()
-        df_max_frame = df_gt_2d["frame"].max()
-        scounter = 0
-        fcounter = 0
-        for id in unique_ids:
-            temp_object_data = df_matched.loc[df_matched["oid_1"].astype(int) == int(id)]
-            temp_gt_object_data = df_gt_2d.loc[df_gt_2d["oid"].astype(int) == int(id)]
-            temp_gt_object_data = temp_gt_object_data.loc[temp_gt_object_data["cid"].astype(int) == 0]
-
-            for f in range(int(df_max_frame)):
-                next_matched_object = temp_object_data.loc[temp_object_data["frame"].astype(int) == int(f)]
-                if next_matched_object.empty:
-                    next_object = temp_gt_object_data.loc[temp_gt_object_data["frame"].astype(int) == int(f)]
-                    x, y, z, cc = kalman_predict(id, f, file_name, False)
-                    x2, y2, z2, cc2 = kalman_predict(id, f, file_name, True)
-                    if cc > 5 or cc2 > 5:
-                        if cc > cc2:
-                            mx = x
-                            my = y
-                            mz = z
-                            mcc = cc
-                        else:
-                            mx = x2
-                            my = y2
-                            mz = z2
-                            mcc = cc2
-                        obj_xyz_temp = [mx, my, mz]
-                        obj_xyz_temp = np.float32(obj_xyz_temp)
-                        # Project Points from 3D to 2D
-                        r_m, _ = cv2.Rodrigues(camera_obj.r_mtrx)
-                        oi, _ = cv2.projectPoints(obj_xyz_temp, r_m,
-                                                  camera_obj.t_mtrx, camera_obj.i_mtrx, camera_obj.cof_mtrx)
-
-                        # Check if object is in image plane
-                        if 1920.0 >= oi[0][0][0] >= 0.0 and 0.0 <= oi[0][0][1] <= 1080.0:
-                            c2_gt_df = df_gt_2d.loc[df_gt_2d["frame"].astype(int) == int(f)]
-                            c2_gt_df = c2_gt_df.loc[c2_gt_df["cid"].astype(int) == 1]
-                            pre_min = math.inf
-                            o_id_temp = config.error_code
-                            # scounter = 0
-                            # fcounter = 0
-                            if not c2_gt_df.empty:
-                                for k in range(len(c2_gt_df)):
-                                    forecast_point = [oi[0][0][0], oi[0][0][1]]
-                                    gt_2d_point_c2 = [c2_gt_df.iloc[k]['x'], c2_gt_df.iloc[k]['y']]
-                                    dist = math.dist(gt_2d_point_c2, forecast_point)
-                                    if dist < pre_min:
-                                        pre_min = dist
-                                        o_id_temp = c2_gt_df.iloc[k]["oid"]
-                                '''
-                                print("Would be a match with distance: " + str(pre_min))
-                                print("Oidc1: " + str(next_object.iloc[0]["oid"]) + " oidc2: " + str(o_id_temp))
-                                '''
-                                if next_object.iloc[0]["oid"].astype(int) == int(o_id_temp):
-                                    scounter += 1
-                                else:
-                                    fcounter += 1
-
-            print("scounter: " + str(scounter) + ", fcounter: " + str(fcounter))
-
-    else:
-        print("kalman_pair: Missing file.")
-        return config.error_code
-
 
 def kalman_predict(obj_id, frame_number, file_name, reverse_flag):
     '''
@@ -352,3 +162,127 @@ def kalman_predict(obj_id, frame_number, file_name, reverse_flag):
     else:
         print("File cannot be found: " + file_name + " at function: kalman_predict")
         return config.error_code, config.error_code
+
+
+
+def kalman_fill(file_name, frame_window, how_many_frames):
+    '''
+    Not used in the final implementation. Could potentially be used to 
+    interpolate between empty frames with un-matched points.
+    '''
+    path_to_check_1 = Path(f"result_files/{file_name}.csv")
+    if path_to_check_1.exists():
+        df_matched = pd.read_csv(path_to_check_1)
+
+        counter = 0
+
+        unique_ids = df_matched["gtoid"].unique()
+        unique_ids.sort()
+        print(unique_ids)
+        for id in unique_ids:
+
+            object_data = df_matched.loc[df_matched["oid_1"].astype(int) == int(id)]
+
+            # how_many_frames = len(object_data)
+            # print(how_many_frames)
+            first_frame_num = object_data.iloc[0]["frame"].astype(int)
+            # last_frame_num = object_data.iloc[how_many_frames - 1]["frame"].astype(int)
+            diff_frame = len(object_data)
+
+            if how_many_frames != diff_frame:
+                print("Not complete object with id: " + str(id))
+                temp_frame_value = object_data.iloc[0]["frame"].astype(int)
+                for z in range(1, frame_window):
+                    frame_value = object_data.iloc[z]["frame"].astype(int)
+                    if (frame_value - temp_frame_value) != 1:
+                        df_matched = df_matched.append(
+                            pd.DataFrame(
+                                {"frame": temp_frame_value + 1, "gtoid": object_data.iloc[z]['gtoid'],
+                                 "oid_1": object_data.iloc[z]['oid_1'],
+                                 "oid_2": object_data.iloc[z]['oid_2'],
+                                 "x": object_data.iloc[z]['x'], "y": object_data.iloc[z]['y'],
+                                 "z": object_data.iloc[z]['z'], "gtx": object_data.iloc[z]['gtx'],
+                                 "gty": object_data.iloc[z]['gty'], "gtz": object_data.iloc[z]['gtz'], "ee": 0.0,
+                                 "dt1": object_data.iloc[z]['dt1'], "dt2": object_data.iloc[z]['dt2'],
+                                 "dt3": object_data.iloc[z]['dt3']}, index=[0]))
+                    else:
+                        temp_frame_value = frame_value
+
+                # TODO 2: fill rest of the frames
+                temp_estimation = config.error_code
+                update_counter = 0
+
+                KFx = classes.KalmanFilter(0.1, 1, 1, 1, 0.1, 0.1)
+                KFy = classes.KalmanFilter(0.1, 1, 1, 1, 0.1, 0.1)
+                KFz = classes.KalmanFilter(0.1, 1, 1, 1, 0.1, 0.1)
+                run_len = len(object_data)
+                if run_len > 181:
+                    start = run_len - 181
+                else:
+                    start = 0
+                temp_frame_value = object_data.iloc[start]["frame"].astype(int) - 1
+                for k in range(start, run_len):
+                    # Predict
+                    (xv, t4) = KFx.predict()
+                    (yv, t5) = KFy.predict()
+                    (zv, t6) = KFz.predict()
+
+                    frame_value = object_data.iloc[k]["frame"].astype(int)
+
+                    # Update
+                    row = object_data.loc[object_data['frame'].astype(float) == float(frame_value)]
+                    if len(row) > 0:
+                        txv = row.iloc[0]['x'].astype(float)
+                        tyv = row.iloc[0]['y'].astype(float)
+                        tzv = row.iloc[0]['z'].astype(float)
+
+                        (x1, t1) = KFx.update((txv, tyv))
+                        (y1, t2) = KFy.update((tyv, tzv))
+                        (z1, t3) = KFz.update((tzv, txv))
+                        update_counter += 1
+                    if (frame_value - temp_frame_value) != 1:
+                        # TODO: Assign estimated values and calculate estimation error for estimated value.
+                        missing_frames = frame_value - temp_frame_value
+
+                        for t in range(1, missing_frames - 1):
+                            print("xv:" + str(xv) + ", gtxv: " + str(row.iloc[0]['x']) + ", update_counter: " +
+                                  str(update_counter) + " frame: " + str(temp_frame_value + t))
+                            mt1 = np.squeeze(np.asarray(xv))
+                            mt2 = np.squeeze(np.asarray(yv))
+                            mt3 = np.squeeze(np.asarray(zv))
+                            mt1 = mt1.tolist()
+                            mt2 = mt2.tolist()
+                            mt3 = mt3.tolist()
+                            if len(mt1) > 1 and len(mt2) > 1 and len(mt3) > 1:
+                                mt2 = mt2[0]
+                                mt1 = mt1[0]
+                                mt3 = mt3[0]
+                                df_matched = df_matched.append(
+                                    pd.DataFrame(
+                                        {"frame": temp_frame_value + t, "gtoid": object_data.iloc[k]['gtoid'],
+                                         "oid_1": object_data.iloc[k]['oid_1'],
+                                         "oid_2": object_data.iloc[k]['oid_2'],
+                                         "x": mt1, "y": mt2,
+                                         "z": mt3, "gtx": object_data.iloc[k]['gtx'],
+                                         "gty": object_data.iloc[k]['gty'], "gtz": object_data.iloc[k]['gtz'],
+                                         "ee": 0.0,
+                                         "dt1": object_data.iloc[k]['dt1'], "dt2": object_data.iloc[k]['dt2'],
+                                         "dt3": object_data.iloc[k]['dt3']}, index=[0]))
+
+                                # Predict
+                                (xv, t4) = KFx.predict()
+                                (yv, t5) = KFy.predict()
+                                (zv, t6) = KFz.predict()
+
+                                (x1, t1) = KFx.update((mt1, mt2))
+                                (y1, t2) = KFy.update((mt2, mt3))
+                                (z1, t3) = KFz.update((mt3, mt1))
+
+                    temp_frame_value = frame_value
+
+            else:
+                print("Complete object with id: " + str(id))
+
+        df_matched = df_matched.sort_values(by=['frame', 'gtoid'], ascending=[True, True])
+        df_matched.to_csv(f"result_files/recon1.csv", index=False)
+

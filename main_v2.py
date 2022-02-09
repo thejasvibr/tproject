@@ -1,3 +1,4 @@
+'''
 # References & used resources for this implementation:
 # https://docs.opencv.org/3.4/
 # https://stackoverflow.com/
@@ -6,6 +7,13 @@
 # Mixed-reality spatial configuration with a zed mini stereoscopic camera, 2018, Chotrov, D et al.
 # Determining the epipolar geometry and its uncertainty: A review, 1998, Zhang et al.
 
+
+
+
+Original code written by Giray Tandogan 
+
+
+'''
 import math
 import numpy
 import numpy as np
@@ -70,6 +78,8 @@ def calc_distance_point_line(p, q, r):
 
 def calcFundamentalMatrix(camera_1_o, camera_2_o):
     '''
+    Calculates the fundamental matrix 
+
     Parameters
     ----------
     camera_1_o, camera_2_o : classes.Camera instances 
@@ -83,6 +93,14 @@ def calcFundamentalMatrix(camera_1_o, camera_2_o):
     -----
     For details please check page 246 "Multiple View Geometry".
     Used formula F = [e']_x * P' * p^+
+                      
+    The fundamental matrix is a 3X3 matrix which maps a point on cam1 onto potential 
+    points on camera 2. The epipolar line can be computed from the fundamental matrix
+
+    See Also 
+    --------
+    find_candidate
+    cv2.computeCorrespondEpilines
     '''
     rt = camera_1_o.r_mtrx.transpose()
     rt = np.negative(rt)
@@ -186,7 +204,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
     '''
     Receives 2D projections from 2 cameras. Does epipolar matching, and after 10 
     frames applies Kalman Filtering, and gets robust pairing. 
-    
+
     Does not assume that camera 1 and camera 2 have the same parameters. 
 
     Parameters
@@ -209,7 +227,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
         Average estimation error in metres
     -1 : int
         Significance of the value unclear (says Giray)
-    
+
     Side effects
     ------------
     Write 'result_files/{result_file_name}.csv' with columns:
@@ -228,7 +246,13 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
     ----
     * During pairing, it's important to write a separate function which 
     checks that object ids are consistently matched - ideally after the recon2 output is created
-    
+    * Convert the epipolar line threshold to a user input variable instead of the currently hard-coded 50 pixels
+    * Currently scount assumes object IDs are the same across the cameras -- needs to be generalised
+    * np.isclose is used to check if two points are the same, and a hard-coded threshold of 0.0001 is used. This 
+        may cause issues when data with high-precision tracking accuracy.
+    * Right now All 2D points are assumed to be UNDISTORTED! Undistortion is applied however if distortion coefficients
+    are provided. This needs to be checked once more for correctness.
+
     References 
     ----------
     * Giray's Master Thesis
@@ -273,7 +297,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
 
             cont = True # continue flag - becomes False after correspondence checks with all 
             # available pionts in frames are done
-            temp_c2 = at_frame_c2.copy()
+            temp_c2 = at_frame_c2.copy() # all points on camera 2 at this frame
 
             # p1 = numpy.float64([cand1[0][0][0], cand1[0][0][1], 1])
             # p2 = numpy.float64([cand2[0][0][0], cand2[0][0][1], 1])
@@ -307,6 +331,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                         if (np.isclose(temp_p[0], cand_p_2[0], atol=0.0001) and
                                 np.isclose(temp_p[1], cand_p_2[1], atol=0.0001)):
                             # print("Successful match")
+                            
                             candp2 = cv2.undistortPoints(cand_p_2, camera1.i_mtrx, camera1.cof_mtrx,
                                                          P=camera1.i_mtrx)
                             candp1 = cv2.undistortPoints(cand_p_1, camera2.i_mtrx, camera2.cof_mtrx,
@@ -344,12 +369,13 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                             if z_2 > 0.0:
 
                                 if do_kalman_filter_predictions and i > config.kf_frame_required * 2:
-                                    x, y, z, k_cal_counter = kalman_functions.kalman_predict(
-                                        pre_id_1, fn, "recon2", False)
+                                    # forward pass of kalman prediction
+                                    x, y, z, k_cal_counter = kalman_functions.kalman_predict(pre_id_1, fn, "recon2", False)
                                     if config.reverse_kf:
-                                        x2_kf, y2_kf, z2_kf, k_cal_counter2_kf = kalman_functions.kalman_predict(
-                                            pre_id_1, fn, "recon2", True)
-                                        if k_cal_counter > k_cal_counter2_kf:
+                                        # reverse pass of kalman prediction - requires a pre-existing 
+                                        # result file
+                                        x2_kf, y2_kf, z2_kf, k_cal_counter2_kf = kalman_functions.kalman_predict(pre_id_1, fn, "recon2", True)
+                                        if k_cal_counter > k_cal_counter2_kf: # if available frame of forward run > reverse run
                                             pass
                                         else:
                                             x = x2_kf
@@ -361,7 +387,8 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                                     # dist_2_points = sqrt((x - gtx) ** 2 + (y - gty) ** 2)
                                     # 3D distance
                                     forecast_point = [x, y, z]
-                                    dist_2_points = distance.euclidean(s_point, forecast_point)
+                                    # compare kalman prediction with 3d triangulation
+                                    dist_2_points = distance.euclidean(s_point, forecast_point) 
                                     epipolar_distance_check = False
                                     if dist_2_points < config.kf_distance_threshold:
                                         write_result = True
@@ -379,6 +406,9 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                                             if k_cal_counter <= config.kf_frame_required:
                                                 # write_result = True
                                                 pass
+                                    # check that both one-way and two-way epipolar line
+                                    # distances of the points are within a threshold. 
+                                    # Here the threshold is hard-coded to 50 pixels.
                                     if config.kf_frame_required >= k_cal_counter and not epipolar_distance_check:
                                         if abs(pre_min_1) < 50 and abs(pre_min_2) < 50:
                                             write_result = True
@@ -407,20 +437,18 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                                              "dt1": pre_min_1, "dt2": pre_min_2, "dt3": dist_2_points,
                                              "kcounter": k_cal_counter}, index=[0]))
                                     cont = False
+                                    # THIS IS ONLY VALID FOR THE SYNTHETIC DATA AND STARLING DATA
+                                    # The object IDs (pre_id_1 and pre_id_2) have been artificially set to be the same!!
+                                    
                                     if t4.iloc[0]['oid'] == pre_id_1 and pre_id_1 == pre_id_2:
                                         scounter += 1
                                     else:
-                                        '''
-                                        print("Failed match at frame: " + str(pre_frame_1) + ", oid: " + str(pre_id_1) +
-                                              ", kalman distance: " + str(dist_2_points) +
-                                              ", epipolar distance: " + str(pre_min_1) + ", " + str(pre_min_2) +
-                                              ", estimation error: " + str(estimation_error))
-                                        '''
                                         fcounter += 1
                                     ccount += 1
 
                                 if do_kalman_filter_predictions and not config.multi_run:
                                     df_recon.to_csv(f"result_files/{result_file_name}.csv", index=False)
+                                # kalman filling Not implemented 
                                 if call_kalman_fill:
                                     kalman_functions.kalman_fill("recon1", 10, i)
                                     call_kalman_fill = False
@@ -431,11 +459,8 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                                 avg_ee += estimation_error
                                 # print(res_tr)
                                 if estimation_error > 1.0:
-                                    # print("ee: " + str(estimation_error), " frame1:" + str(pre_frame_1) +
-                                    #       " frame2: " + str(pre_frame_2) + " oid: " + str(oid_f) +
-                                    #       " pre_id_1: " + str(pre_id_1) + " pre_id_2: " + str(pre_id_2) +
-                                    #       "dist_1: " + str(pre_min_1) + "dist_2" + str(pre_min_2))
                                     pass
+                        # if the two-way authentication does not giveany points
                         else:
                             # print("Unsuccessful match")
                             # Drop unsuccessful row
@@ -447,10 +472,12 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                             # print("At i: " + str(i) + " deleting point: " + str(cp1))
                             # print("New df: " + str(at_frame_c2))
                     else:
+                        # if there is NO candidate found in the 20way auth epipolar line
                         cont = False
                 else:
                     cont = False
     df_recon.to_csv(f"result_files/{result_file_name}.csv", index=False)
+    # report all the performance diagnostics
     if (scounter + fcounter) > 0 and run_len != 0:
         print("Matching trajectory performance: " + str(scounter / (scounter + fcounter)) + " Scounter = " +
               str(scounter) + " Fcounter = " + str(fcounter))
@@ -463,6 +490,17 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
 
 
 def reconstruct_trajectories(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name):
+    '''
+    Parameters
+    ----------
+    camera1, camera2: classes.Camera instances 
+    df_2d : pd.DataFrame
+        Matched points with object ids across the 2 cameras
+    df_3d_gt: pd.DataFrame 
+        Groundtruth 3D data
+    result_file_name : string
+        Target output file name
+    '''
     df_2d = df_2d.sort_values('frame')
     df_t = df_2d.loc[df_2d['cid'] == camera1.id]
     df_t_2 = df_2d.loc[df_2d['cid'] == camera2.id]
@@ -501,7 +539,8 @@ def reconstruct_trajectories(camera1, camera2, df_2d: pd, df_3d_gt, result_file_
 
         at_frame_c1 = df_t.loc[df_t['frame'] == fn]
         check_if = int(i % (run_len / 100.0 * 1.0))
-        call_kalman_fill = False
+        call_kalman_fill = False # not used anywhere - flag to activate  Kalman based
+        # 'filling' or interpolation of 2D points that were not matched to a trajectory
         if check_if == 0:
             print("Reconstruction progress: " + str(int(i / run_len * 100)) + "%")
 
@@ -1356,6 +1395,19 @@ def create_camera(camera_df, index):
 
 
 def find_best_pair_of_cameras(camera_df, gt_3d_df):
+    '''
+    Projects 3D groundtruth data onto each camera, and checks the number
+    of points with valid 2D projections. 
+    
+    Parameters
+    ----------
+    camera_df : pd.DataFrame
+        Output from run_setup_starling()
+
+    See Also
+    --------
+    run_setup_starling
+    '''
     best_c1, best_c2 = math.inf, math.inf
     best_c1_id, best_c2_id = -1, -1
     for i in range(len(camera_df)):
@@ -1415,6 +1467,8 @@ if __name__ == '__main__':
     fmatrix = calcFundamentalMatrix(create_camera(found_camera_df, 0), create_camera(found_camera_df, 1))
 
     # find_best_pair_of_cameras(camera_df, gt_3d_df)
+    
+    print('...found best pair')
     if r1 and do_estimations:
         # Get projection dataframes.
         # _, _ = data_functions.project_to_2d_and_3d(gt_3d_df, camera_1, mu=0.0, sigma=0.0, mu3d=0, sigma3d=0)
