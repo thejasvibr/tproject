@@ -20,6 +20,8 @@ where ```frame``` is the frame number, ```object_id``` is object id, ```camera_i
 
 The  2D tracks across the two cameras need to be loaded into a ```pd.DataFrame``` object first.
 
+*TODO: INCLUDE SPECIFICS ON WHETHER THE 2D COORDINATES ARE UN-DISTORTED OR NOT!!!!!!!!!!!!*
+
 ## A short example
 
 ```

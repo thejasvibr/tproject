@@ -139,20 +139,7 @@ def kalman_predict(obj_id, frame_number, file_name, reverse_flag):
                     if counter == frame_number - 1:
                         # print("Error at kalman_predict()")
                         return -1, -1, -1, cal_counter
-                ''' 
-                    # Predict
-                    (x, y) = KF.predict()
-                    mt = np.squeeze(np.asarray(x))
-                    if mt.size > 1:
-                        (x1, y1) = KF.update((mt[0], mt[1]))
-                        # print("Empty update")
-                    if counter == frame_number - 1:
-                        if counter == frame_number - 1:
-                            if mt.size > 1:
-                                return mt[0], mt[1]
-                            # print("Frame problem.")
-                            return -1, -1
-                '''
+
         else:
             return -1, -1, -1, -1
 
