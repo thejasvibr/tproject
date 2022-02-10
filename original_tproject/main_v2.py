@@ -259,7 +259,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
     '''
     df_2d = df_2d.sort_values('frame')
     df_t = df_2d.loc[df_2d['cid'] == camera1.id] # trajectories cam 1
-    df_t_2 = df_2d.loc[df_2d['cid'] == camera2.id] #trajectores cam 2
+    df_t_2 = df_2d.loc[df_2d['cid'] == camera2.id] # trajectores cam 2
 
     run_len = len(df_t)  # Number of frames.
 
