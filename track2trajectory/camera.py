@@ -10,12 +10,14 @@ import numpy as np
 class Camera:
     '''
     Generates camera objects with all specified parameters
+
     
     '''
-    def __init__(self, c_id, pos, f, c_x, c_y, f_x, f_y, i_mtrx, t_mtrx, r_mtrx, cof_mtrx, rel_pos, cm_mtrx):
-        self.id = c_id
-        self.pos = np.float32(pos)
-        self.f = np.float32(f)
+    def __init__(self, c_id, pos, f, c_x, c_y, f_x, f_y,
+                         i_mtrx, t_mtrx, r_mtrx, cof_mtrx, rel_pos, cm_mtrx):
+        self.id = c_id # camera ID
+        self.pos = np.float32(pos) # ???
+        self.f = np.float32(f) # 
         self.c_x = np.float32(c_x) 
         self.c_y = np.float32(c_y)
         self.f_x = np.float32(f_x)

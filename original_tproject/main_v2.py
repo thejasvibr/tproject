@@ -1284,7 +1284,7 @@ def run_setup_starling():
     None
     But - hard coded are 1) .xcp camera parameters file and 2) the unit conversion from 
     mm to m (/1000)
-    
+
     Returns
     -------
     camera_df : pd.DataFrame
