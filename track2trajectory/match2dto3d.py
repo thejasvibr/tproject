@@ -5,9 +5,12 @@ This module contains functions which perform multi-camera 2D track matching
 to their corresponding 3D trajectories.
 '''
 import cv2
+import math
 import numpy as np 
 import pandas as pd
 from scipy.spatial import distance
+import track2trajectory.camera as camera
+from tqdm import tqdm
 
 def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, fm_1,
                                **kwargs):
@@ -19,8 +22,8 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
 
     Parameters
     ----------
-    camera1 : classes.Camera
-    camera2 : classes.Camera
+    camera1 : camera.Camera
+    camera2 : camera.Camera
     df_2d : pd.DataFrame
         2D projections of objects
     df_3d_gt : pd.DataFrame
@@ -70,7 +73,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
     ----------
     * Giray's Master Thesis
     '''
-    kf_distance_threshold = kwargs.get('kf_distance_threshold', 0.3)
+    kf_distance_threshold = kwargs.get('kf_distance_threshold', 0.3) # metres
     
     df_2d = df_2d.sort_values('frame')
     df_t = df_2d.loc[df_2d['cid'] == camera1.id] # trajectories cam 1
@@ -90,7 +93,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
     # _, _, pm2, pm3, _ = cv2.stereoRectify(camera1.cm_mtrx, camera1.cof_mtrx, camera2.cm_mtrx, camera2.cof_mtrx,
     # np.size(1920, 1080), camera1.r_mtrx, camera1.t_mtrx)
 
-    for i in range(0, run_len):
+    for i in tqdm.trange(run_len):
         temp_p = np.float32([df_t.iloc[i]['x'], df_t.iloc[i]['y']])
         # temp_p = df_t.iloc[i:i+1]
         # Get proper frame values for comparison.
@@ -98,16 +101,14 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
         at_frame_c2 = df_t_2.loc[df_t_2['frame'] == fn]
 
         at_frame_c1 = df_t.loc[df_t['frame'] == fn]
-        check_if = int(i % (run_len / 100.0 * 1.0)) # progress bar
-        call_kalman_fill = False
-        if check_if == 0:
-            print("Estimating progress: " + str(int(i / run_len * 100)) + "%")
 
-            if (scounter + fcounter) != 0:
-                print("Matching perf: " + str(scounter / (scounter + fcounter)) + " Scounter = " +
-                      str(scounter) + " Fcounter = " + str(fcounter) +
-                      " Matching rate: " + str(((scounter + fcounter) / i) * 100.0))
-                call_kalman_fill = False
+        call_kalman_fill = False
+
+        if (scounter + fcounter) != 0:
+            print("Matching perf: " + str(scounter / (scounter + fcounter)) + " Scounter = " +
+                  str(scounter) + " Fcounter = " + str(fcounter) +
+                  " Matching rate: " + str(((scounter + fcounter) / i) * 100.0))
+            call_kalman_fill = False
         if not at_frame_c2.empty and not at_frame_c1.empty:
 
             cont = True # continue flag - becomes False after correspondence checks with all 
@@ -302,94 +303,3 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
         matching_suc = scounter / (scounter + fcounter)
 
     return avg_ee, -1
-
-def find_candidate(df_2d_c1, fund_matrix, camera1: classes.Camera, camera2: classes.Camera, candidate_point,
-                   known_depth_for_camera, threshold, rec):
-    '''
-    Gives the 2D point closest to the epipolar line projected from the reference camera.
-
-    Parameters
-    ----------
-    df_2d_c1 : pd.DataFrame
-        xy coordinates for on the camera 'reference' camera  (assigned to number 1)
-    fund_matrix: np.array
-        Fundamental matrix. 
-    camera1, camera2 : classes.Camera instances
-    candidate_point :  np.array (np.float32)
-    known_depth_for_camera : float >0 
-        Not used any more in the latest implementation -- but 'works'
-    threshold : float 
-        Not used any more in the latest implementation -- but 'works'
-    rec : bool
-        True/False - not used any more -- but 'works'
-        Should ALWAYS BE FALSE!!!!!!!!!!!!!!!!!!!!!!!
-    
-    Returns 
-    -------
-    pre_p : np.array
-        x,y coordinates of the point with min distance to epipolar line on the 
-        other camera
-    pre_min : float
-        The perpendicular Euclidean distance of the best match to the epipolar line
-    pre_frame : int 
-        Frame number. This is here more for diagnostic reasons as the pre_frame should 
-        match the same frame number as df_2d_c1
-    pre_id : int
-        Object id of the best point in the 'other' camera 
-    row_num : int 
-        The row number of the best matchign point in df_2d_c1. This too is here more 
-        for diagnostic reasons.
-        
-    See Also
-    --------
-    calcFundamentalMatrix
-    
-    
-    '''
-    run_len = len(df_2d_c1)
-    pre_min = math.inf
-    x_cand, y_cand, pre_frame, pre_id = -1, -1, -1, -1
-    pre_p = []
-    row_num = -1
-
-    for k in range(run_len):
-        temp_p = np.float32([df_2d_c1.iloc[k]['x'], df_2d_c1.iloc[k]['y']])
-        if len(candidate_point) != 0:
-            points_undistorted_2 = cv2.undistortPoints(candidate_point, camera2.i_mtrx, camera2.cof_mtrx,
-                                                       P=camera2.i_mtrx)
-        else:
-            return [], -1, -1, -1, -1
-
-
-        # Set camera ids for computeCorrespondEpilines()
-        if camera1.id < camera2.id:
-            cid = 1
-        else:
-            cid = 2
-
-        # Find epipolar line values: a,b,c. From ax+by+c=0.
-        df1numpya = np.float64(df_2d_c1[['x', 'y']].to_numpy())
-        epilines = cv2.computeCorrespondEpilines(df1numpya, cid, fund_matrix)
-        v_a = epilines[k][0][0]
-        v_b = epilines[k][0][1]
-        v_c = epilines[k][0][2]
-        dist_fund_point = (points_undistorted_2[0][0][0] * v_a) + (points_undistorted_2[0][0][1] * v_b) + v_c
-
-        # if dist_2d_2 < pre_min and dist_2d_2 < threshold:
-        if abs(dist_fund_point) < pre_min:
-            pre_min = abs(dist_fund_point)
-            pre_id = df_2d_c1.iloc[k]['oid']
-            pre_frame = df_2d_c1.iloc[k]['frame']
-            pre_p = temp_p
-            row_num = k
-        else:
-            pass
-
-    if pre_min > 0.1 and known_depth_for_camera >= 1 and rec:
-        pre_p2, pre_min2, pre_frame2, pre_id2, row_num2 = find_candidate(df_2d_c1, fund_matrix, camera1, camera2,
-                                                                         candidate_point, known_depth_for_camera - 1,
-                                                                         threshold, rec)
-        if pre_min2 < pre_min:
-            pre_p, pre_min, pre_frame, pre_id, row_num = pre_p2, pre_min2, pre_frame2, pre_id2, row_num2
-
-    return pre_p, pre_min, pre_frame, pre_id, row_num
