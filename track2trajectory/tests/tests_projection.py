@@ -25,7 +25,7 @@ class Check2DProjectionWorks(unittest.TestCase):
         data_xyz= {'frame' : np.arange(num_frames),
                'x' : np.random.normal(-1, 0.1, num_frames),
                'y' : np.random.normal(-1, 0.1, num_frames),
-               'z' : np.random.normal(-10, 0.1, num_frames)}
+               'z' : np.random.normal(1, 0.1, num_frames)}
         self.point_xyz = pd.DataFrame(data=data_xyz)
         self.point_xyz['oid'] = 1
 
@@ -33,6 +33,25 @@ class Check2DProjectionWorks(unittest.TestCase):
         twod_projections, num_failed = projection.project_to_2d_and_3d(self.point_xyz, 
                                                         self.camera1,
                                                         )
-        # print(twod_projections.head())
+        print(num_failed)
+
+class CheckFundamentalMatrixCalculationWorks(unittest.TestCase):
+    
+    def setUp(self):
+        '''
+        '''
+        cameras123 = syndata.generate_three_synthetic_cameras()
+        self.camera1 = cameras123[0]
+        self.camera2 = cameras123[1]
+        self.camera3 = cameras123[2]
+    def test_fundamentalmatrixworks(self):
+        fundamental_matrix = projection.calcFundamentalMatrix(self.camera1,
+                                                              self.camera2)
+
+
+        
+
+
+
 if __name__ == '__main__':
     unittest.main()

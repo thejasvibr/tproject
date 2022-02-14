@@ -15,6 +15,44 @@ class Camera:
     '''
     def __init__(self, c_id, pos, f, c_x, c_y, f_x, f_y,
                          i_mtrx, t_mtrx, r_mtrx, cof_mtrx, rel_pos, cm_mtrx):
+        '''
+
+        Parameters
+        ----------
+        c_id : int
+            camera id.
+        pos : (1,1,2) np.array
+            ? Epipolar point ? (the intersection point on image plane
+            of the line between two camera centers) ?? 
+            Doesn't seem to be used in the code - can possibly be removed
+        f : float
+            focal length in pixels
+        c_x : float
+            camera x centre in pixels
+        c_y : float
+            camera y centre in pixels
+        f_x : float
+            DESCRIPTION.
+        f_y : TYPE
+            DESCRIPTION.
+        i_mtrx : 3x3 np.array
+            Intrinsic matrix of the form 
+            f 0 c_x  
+            0 f c_y 
+            0 0  1 
+        t_mtrx : (3,) or (3,1) np.array
+            translation matrix
+        r_mtrx : 3x3  np.array
+            Rotation matrix
+        cof_mtrx : (N,) np.array
+            Distortion coefficients 
+        rel_pos : TYPE
+            DESCRIPTION.
+        cm_mtrx : 3x4 np.array
+            Camera matrix with the rotation (3x3) and translation matrix (3x1)
+            column stacked.
+
+        '''
         self.id = c_id # camera ID
         self.pos = np.float32(pos) # ???
         self.f = np.float32(f) # 

@@ -12,6 +12,100 @@ from scipy.spatial import distance
 import track2trajectory.camera as camera
 from tqdm import tqdm
 
+def find_candidate(df_2d_c1, fund_matrix, camera1: camera.Camera,
+                   camera2: camera.Camera, candidate_point,
+                   known_depth_for_camera, threshold, rec):
+    '''
+    Gives the 2D point closest to the epipolar line projected from the reference camera.
+
+    Parameters
+    ----------
+    df_2d_c1 : pd.DataFrame
+        xy coordinates for on the camera 'reference' camera  (assigned to number 1)
+        With at the least the following columns : x, y, oid, frame
+    fund_matrix: 3x3 np.array
+        The fundamental matrix. The fundamental matrix is a matrix which transforms
+        a set of points Xi on one camera into their corresponding points Xj onto 
+        another camera.
+    camera1, camera2 : camera.Camera instances
+    candidate_point :  np.array (np.float32)
+    known_depth_for_camera : float >0 
+        Not used any more in the latest implementation -- but 'works'
+    threshold : float 
+        Not used any more in the latest implementation -- but 'works'
+    rec : bool
+        True/False - not used any more -- but 'works'
+        Should ALWAYS BE FALSE!!!!!!!!!!!!!!!!!!!!!!!
+
+    Returns 
+    -------
+    pre_p : np.array
+        x,y coordinates of the point with min distance to epipolar line on the 
+        other camera
+    pre_min : float
+        The perpendicular Euclidean distance of the best match to the epipolar line
+    pre_frame : int 
+        Frame number. This is here more for diagnostic reasons as the pre_frame should 
+        match the same frame number as df_2d_c1
+    pre_id : int
+        Object id of the best point in the 'other' camera 
+    row_num : int 
+        The row number of the best matching point in df_2d_c1. This too is here more 
+        for diagnostic reasons.
+
+    See Also
+    --------
+    projection.calcFundamentalMatrix
+    '''
+    run_len = len(df_2d_c1)
+    pre_min = math.inf
+    x_cand, y_cand, pre_frame, pre_id = -1, -1, -1, -1
+    pre_p = []
+    row_num = -1
+
+    for k in range(run_len):
+        temp_p = np.float32([df_2d_c1.iloc[k]['x'], df_2d_c1.iloc[k]['y']])
+        if len(candidate_point) != 0:
+            points_undistorted_2 = cv2.undistortPoints(candidate_point, camera2.i_mtrx, camera2.cof_mtrx,
+                                                       P=camera2.i_mtrx)
+        else:
+            return [], -1, -1, -1, -1
+
+
+        # Set camera ids for computeCorrespondEpilines()
+        if camera1.id < camera2.id:
+            cid = 1
+        else:
+            cid = 2
+
+        # Find epipolar line values: a,b,c. From ax+by+c=0.
+        df1numpya = np.float64(df_2d_c1[['x', 'y']].to_numpy())
+        epilines = cv2.computeCorrespondEpilines(df1numpya, cid, fund_matrix)
+        v_a = epilines[k][0][0]
+        v_b = epilines[k][0][1]
+        v_c = epilines[k][0][2]
+        dist_fund_point = (points_undistorted_2[0][0][0] * v_a) + (points_undistorted_2[0][0][1] * v_b) + v_c
+
+        # if dist_2d_2 < pre_min and dist_2d_2 < threshold:
+        if abs(dist_fund_point) < pre_min:
+            pre_min = abs(dist_fund_point)
+            pre_id = df_2d_c1.iloc[k]['oid']
+            pre_frame = df_2d_c1.iloc[k]['frame']
+            pre_p = temp_p
+            row_num = k
+        else:
+            pass
+
+    if pre_min > 0.1 and known_depth_for_camera >= 1 and rec:
+        pre_p2, pre_min2, pre_frame2, pre_id2, row_num2 = find_candidate(df_2d_c1, fund_matrix, camera1, camera2,
+                                                                         candidate_point, known_depth_for_camera - 1,
+                                                                         threshold, rec)
+        if pre_min2 < pre_min:
+            pre_p, pre_min, pre_frame, pre_id, row_num = pre_p2, pre_min2, pre_frame2, pre_id2, row_num2
+
+    return pre_p, pre_min, pre_frame, pre_id, row_num
+
+
 def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, fm_1,
                                **kwargs):
     '''

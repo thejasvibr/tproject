@@ -1467,7 +1467,7 @@ if __name__ == '__main__':
     fmatrix = calcFundamentalMatrix(create_camera(found_camera_df, 0), create_camera(found_camera_df, 1))
 
     # find_best_pair_of_cameras(camera_df, gt_3d_df)
-    
+
     print('...found best pair')
     if r1 and do_estimations:
         # Get projection dataframes.
