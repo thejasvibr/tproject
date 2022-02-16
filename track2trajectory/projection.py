@@ -7,7 +7,8 @@ import track2trajectory.camera as camera
 
 def calcFundamentalMatrix(camera_1, camera_2):
     '''
-    Calculates the fundamental matrix 
+    Calculates the fundamental matrix that transforms 2D points on camera 1
+    to provide the corresponding 2D points on camera 2
 
     Parameters
     ----------
@@ -47,7 +48,6 @@ def calcFundamentalMatrix(camera_1, camera_2):
     fundamental_matrix = np.matmul(first, p_plus_3)
     return fundamental_matrix
 
-
 def project_to_2d_and_3d(gt_3d_df, camera_obj: camera.Camera,
                          mu=0, sigma=0, mu3d=0, sigma3d=0):
     '''
@@ -60,7 +60,7 @@ def project_to_2d_and_3d(gt_3d_df, camera_obj: camera.Camera,
     
     Parameters
     ----------
-    gt_3d_df : pd.DataFrame 
+    gt_3d_df : (Mrows, Ncols) pd.DataFrame 
         With 3D trajectory information and columns frame, oid, and x,y,z
     camera_obj : classes.Camera instance
     mu : float, optional
@@ -74,13 +74,15 @@ def project_to_2d_and_3d(gt_3d_df, camera_obj: camera.Camera,
 
     Returns
     -------
-    proj_2d_df : pd.DataFrame
+    proj_2d_df : (Mrows, 5) pd.DataFrame
         2D projection dataframe with columns:
             frame
             oid (object id)
             cid (camera id)
             x : column number (increases to the right)
             y : the row number (increases as you move down the image)
+        If projection of a point isnt possible onto the camera view, then NaN
+        is returned.
 
     fail_counter : int
         Number of positions that can't be projected onto the 2D image.    
@@ -92,24 +94,23 @@ def project_to_2d_and_3d(gt_3d_df, camera_obj: camera.Camera,
     for i in range(len(gt_3d_df)):
         # 3D noise
         noise3d = np.random.normal(mu3d, sigma3d, [3, 1])
+        # HERE THE Y AND Z COORDINATES NEED TO BE SWITCHED FOR THE SYSTEM TO 
+        # MAKE SENSE.
         # Set values & add noise. 
         x_temp = gt_3d_df.iloc[i]['x'] + noise3d[0]
-        y_temp = gt_3d_df.iloc[i]['y'] + noise3d[1]
-        z_temp = gt_3d_df.iloc[i]['z'] + noise3d[2]
+        y_temp = gt_3d_df.iloc[i]['z'] + noise3d[1]
+        z_temp = gt_3d_df.iloc[i]['y'] + noise3d[2]
         frame_temp = gt_3d_df.iloc[i]['frame']
 
         oid = gt_3d_df.iloc[i]['oid']
         cid = camera_obj.id
-        obj_xyz_temp = [x_temp, y_temp, z_temp]
-        obj_xyz_temp = np.float32(obj_xyz_temp)
-
+        obj_xyz_temp = np.float32([x_temp, y_temp, z_temp])
         # Project Points from 3D to 2D
         r_m, _ = cv2.Rodrigues(camera_obj.r_mtrx)
         oi, _ = cv2.projectPoints(obj_xyz_temp, r_m,
                                   camera_obj.t_mtrx, 
                                   camera_obj.i_mtrx, 
                                   camera_obj.cof_mtrx)
-
         twodpoint_in_xplane = camera_obj.c_x*2 >= oi[0][0][0] >= 0.0
         twodpoint_in_yplane = 0.0 <= oi[0][0][1] <= camera_obj.c_y*2
         # Check if object is in image plane
@@ -119,10 +120,15 @@ def project_to_2d_and_3d(gt_3d_df, camera_obj: camera.Camera,
             noise = np.random.normal(mu, sigma, [2, 1])
             x2d = np.float32(noise[0] + oi[0][0][0])
             y2d = np.float32(noise[1] + oi[0][0][1])
-            proj_2d_df = proj_2d_df.append(pd.DataFrame({"frame": [frame_temp],
+        else:
+            # if projection is beyond the sensor - then NaN
+            fail_counter +=1
+            x2d = np.nan
+            y2d = np.nan
+        
+        proj_2d_df = proj_2d_df.append(pd.DataFrame({"frame": [frame_temp],
                                                          "oid": [oid],
                                                          "x": x2d, "y": y2d,
                                                          "cid": cid}))
-        else:
-            fail_counter += 1
-    return proj_2d_df, fail_counter
+
+    return proj_2d_df.reset_index(drop=True), fail_counter

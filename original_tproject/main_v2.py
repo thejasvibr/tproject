@@ -1157,7 +1157,7 @@ def distance_to_line(p1, p2, self):
 
 def run_setup():
     '''
-    Generates synthetic cameras and points. 
+    Generates synthetic cameras.
     Two cameras are generated with hard-coded parameters. When points are generated, 
     they will always be in FOV of both cameras (unless there's a lot of 3D noise.).
     

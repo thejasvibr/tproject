@@ -9,6 +9,7 @@ import pandas as pd
 import unittest 
 import track2trajectory.projection as projection
 import track2trajectory.synthetic_data as syndata
+from scipy.spatial.transform import Rotation as R
 
 class Check2DProjectionWorks(unittest.TestCase):
     
@@ -34,6 +35,33 @@ class Check2DProjectionWorks(unittest.TestCase):
                                                         self.camera1,
                                                         )
         print(num_failed)
+
+class Verify2DProjectionResults(unittest.TestCase):
+    '''
+    Sets up one simulated camera at -1,0,0 facing towards the origin.
+    Test points are placed at +ve X and 0 Y coordinates, and the projection is 
+    checked.
+    '''
+    def setUp(self):
+        # rotate cam1 to the origin, a -90 degree rotation about its y axis
+        rotation_to_origin = R.from_euler('xyz', [0,-90,0],degrees=True).as_matrix()
+        args = {'cam1_Rotation':rotation_to_origin}
+        self.cam1, self.cam2 = syndata.generate_two_synthetic_cameras_version2(**args)
+        self.points_in_space = pd.DataFrame(data={'frame':[1,2,3],
+                                             'x':[1,2,2],
+                                             'y':[0,0,0],
+                                             'z':[0,0.25,0.5],
+                                             'oid': [1]*3,
+                                             'cid':[1]*3})
+
+    def test_2dprojection(self):
+        projected_points, _ = projection.project_to_2d_and_3d(self.points_in_space,
+                                                              self.cam1)
+
+        self.assertTrue(len(projected_points)>0)
+        # check that the pixel coordinates are always the principal x point.
+        ppx_matches = np.array_equal(np.int64(projected_points['x']), np.tile(960,3))
+        self.assertTrue(ppx_matches)
 
 class CheckFundamentalMatrixCalculationWorks(unittest.TestCase):
     

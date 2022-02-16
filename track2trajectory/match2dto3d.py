@@ -13,10 +13,10 @@ import track2trajectory.camera as camera
 from tqdm import tqdm
 
 def find_candidate(df_2d_c1, fund_matrix, camera1: camera.Camera,
-                   camera2: camera.Camera, candidate_point,
-                   known_depth_for_camera, threshold, rec):
+                   camera2: camera.Camera, candidate_point):
     '''
-    Gives the 2D point closest to the epipolar line projected from the reference camera.
+    Gives the 2D point closest to the epipolar line drawn on camera 2. The epipolar
+    line is derived from the candidate point on camera 1. 
 
     Parameters
     ----------
@@ -25,17 +25,10 @@ def find_candidate(df_2d_c1, fund_matrix, camera1: camera.Camera,
         With at the least the following columns : x, y, oid, frame
     fund_matrix: 3x3 np.array
         The fundamental matrix. The fundamental matrix is a matrix which transforms
-        a set of points Xi on one camera into their corresponding points Xj onto 
-        another camera.
+        a set of points Xi on  camera 1 onto their corresponding points Xj onto 
+        camera 2.
     camera1, camera2 : camera.Camera instances
     candidate_point :  np.array (np.float32)
-    known_depth_for_camera : float >0 
-        Not used any more in the latest implementation -- but 'works'
-    threshold : float 
-        Not used any more in the latest implementation -- but 'works'
-    rec : bool
-        True/False - not used any more -- but 'works'
-        Should ALWAYS BE FALSE!!!!!!!!!!!!!!!!!!!!!!!
 
     Returns 
     -------
@@ -56,6 +49,10 @@ def find_candidate(df_2d_c1, fund_matrix, camera1: camera.Camera,
     See Also
     --------
     projection.calcFundamentalMatrix
+    
+    TODO
+    ----
+    Remove the redundancy in output objects
     '''
     run_len = len(df_2d_c1)
     pre_min = math.inf
@@ -71,7 +68,6 @@ def find_candidate(df_2d_c1, fund_matrix, camera1: camera.Camera,
         else:
             return [], -1, -1, -1, -1
 
-
         # Set camera ids for computeCorrespondEpilines()
         if camera1.id < camera2.id:
             cid = 1
@@ -86,7 +82,6 @@ def find_candidate(df_2d_c1, fund_matrix, camera1: camera.Camera,
         v_c = epilines[k][0][2]
         dist_fund_point = (points_undistorted_2[0][0][0] * v_a) + (points_undistorted_2[0][0][1] * v_b) + v_c
 
-        # if dist_2d_2 < pre_min and dist_2d_2 < threshold:
         if abs(dist_fund_point) < pre_min:
             pre_min = abs(dist_fund_point)
             pre_id = df_2d_c1.iloc[k]['oid']
@@ -96,15 +91,7 @@ def find_candidate(df_2d_c1, fund_matrix, camera1: camera.Camera,
         else:
             pass
 
-    if pre_min > 0.1 and known_depth_for_camera >= 1 and rec:
-        pre_p2, pre_min2, pre_frame2, pre_id2, row_num2 = find_candidate(df_2d_c1, fund_matrix, camera1, camera2,
-                                                                         candidate_point, known_depth_for_camera - 1,
-                                                                         threshold, rec)
-        if pre_min2 < pre_min:
-            pre_p, pre_min, pre_frame, pre_id, row_num = pre_p2, pre_min2, pre_frame2, pre_id2, row_num2
-
     return pre_p, pre_min, pre_frame, pre_id, row_num
-
 
 def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, fm_1,
                                **kwargs):
