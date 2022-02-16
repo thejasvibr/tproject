@@ -49,7 +49,7 @@ def find_candidate(df_2d_c1, fund_matrix, camera1: camera.Camera,
     See Also
     --------
     projection.calcFundamentalMatrix
-    
+
     TODO
     ----
     Remove the redundancy in output objects

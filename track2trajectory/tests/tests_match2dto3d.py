@@ -40,7 +40,7 @@ class TestFindCandidateWorks(unittest.TestCase):
             valid_matched_point = np.invert(np.all(np.isnan(matched_point))) and matched_point.size>1
             #if matched_point
             valid_candidate = np.all(np.invert(np.isnan(candidate_point)))
-            
+
             expected_matchedpoint = np.float32(self.cam2_2dpoints.loc[i,['x','y']])
             valid_corresponding_cam2point =  np.all(np.invert(np.isnan(expected_matchedpoint)))
             if valid_matched_point and valid_candidate and valid_corresponding_cam2point:
