@@ -31,7 +31,7 @@ def kalman_predict(obj_id, frame_number, prev_matched_data, min_frames=5,
         Defaults to 5 frames (or 10????) CLARIFY HERE!!!
     reverse_flag :  bool, optional
         Set to True only if there is already a result file.
-        DEfaults to False
+        Defaults to False
 
     Returns
     -------

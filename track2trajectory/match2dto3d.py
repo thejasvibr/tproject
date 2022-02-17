@@ -10,7 +10,10 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import distance
 import track2trajectory.camera as camera
-from tqdm import tqdm
+import tqdm
+import datetime as dt
+from track2trajectory.prediction import kalman_predict
+from track2trajectory.projection import triangulate_points_in3D
 
 def find_candidate(df_2d_c1, fund_matrix, camera1: camera.Camera,
                    camera2: camera.Camera, candidate_point):
@@ -127,7 +130,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
 
     Side effects
     ------------
-    Write 'result_files/{result_file_name}.csv' with columns:
+    Write '{result_file_name}_{<timestamp>}.csv' with columns:
         frame : frame number
         oid_1, oid_2 : object id in camera 1 and camera 2
         x,y,z : estimated xyz position
@@ -141,6 +144,8 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
 
     TODO
     ----
+    * Split function into multiple parts -- it's too big
+    * Rename the function
     * During pairing, it's important to write a separate function which 
     checks that object ids are consistently matched - ideally after the recon2 output is created
     * Convert the epipolar line threshold to a user input variable instead of the currently hard-coded 50 pixels
@@ -155,6 +160,13 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
     * Giray's Master Thesis
     '''
     kf_distance_threshold = kwargs.get('kf_distance_threshold', 0.3) # metres
+    do_kalman_filter_predictions = kwargs.get('do_kalman_filter_predictions', True)
+    kf_frame_required = kwargs.get('kf_frame_required', 5)
+    reverse_kf = kwargs.get('reverse_kf', False)
+    multi_run = kwargs.get('multi_run', False)
+    # save df with timestamp
+    yyyymmdd = dt.datetime.now().strftime('%Y-%m-%d')
+    
     
     df_2d = df_2d.sort_values('frame')
     df_t = df_2d.loc[df_2d['cid'] == camera1.id] # trajectories cam 1
@@ -211,7 +223,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                     ignore_candidate = False
                 dist_2_points = -1
                 cand_p_1, pre_min_1, pre_frame_1, pre_id_1, row_num1 = find_candidate(temp_c2, outfm, camera2,
-                                                                                      camera1, temp_p, 20, 2000, False)
+                                                                                      camera1, temp_p)
 
                 if len(cand_p_1) != 0:
                     temp_c1 = at_frame_c1.copy()
@@ -220,7 +232,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                     # the 'two-way authentication' is done here. The epipolar of the 'best point' in Cam 2 is 
                     # is the projected onto Cam 1 - and the point closest to this epipolar is checked.
                     cand_p_2, pre_min_2, pre_frame_2, pre_id_2, row_num1 = find_candidate(temp_c1, outfm, camera1,
-                                                                                          camera2, cp1, 20, 2000, False)
+                                                                                          camera2, cp1)
 
                     if len(cand_p_2) != 0:
                         # check that the '2-way auth' point on Cam1 is the same as the original 
@@ -233,27 +245,30 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                                                          P=camera1.i_mtrx)
                             candp1 = cv2.undistortPoints(cand_p_1, camera2.i_mtrx, camera2.cof_mtrx,
                                                          P=camera2.i_mtrx)
-                            tri_res = cv2.triangulatePoints(camera1.cm_mtrx, camera2.cm_mtrx,
-                                                            candp2, candp1)
-                            x_2 = tri_res[0] / tri_res[3]
-                            y_2 = tri_res[1] / tri_res[3]
-                            z_2 = tri_res[2] / tri_res[3]
+                            
+
+                            # tri_res = cv2.triangulatePoints(camera1.cm_mtrx, camera2.cm_mtrx,
+                            #                                 candp2, candp1)
+                            # x_2 = tri_res[0] / tri_res[3]
+                            # y_2 = tri_res[1] / tri_res[3]
+                            # z_2 = tri_res[2] / tri_res[3]
+                            s_point = triangulate_points_in3D(candp2, candp1, 
+                                                              camera1, camera2,
+                                                                         )
                             # Get groun truth 3D value.
                             oid_f = df_t.iloc[i]['oid']
                             t1 = df_t.iloc[i]['frame']
                             t2 = df_3d_gt.loc[np.float32(df_3d_gt['frame']) == np.float32(t1)]
                             t4 = t2.loc[np.float32(t2['oid']) == oid_f]
 
-                            xf = x_2
-                            yf = y_2
-                            zf = z_2
-                            s_point = [x_2, y_2, z_2] # estimated xyz position
+                            # s_point = [x_2, y_2, z_2] # estimated xyz position
 
                             gtx = t4.iloc[0]['x']
                             gty = t4.iloc[0]['y']
                             gtz = t4.iloc[0]['z']
 
                             gt_point = [t4.iloc[0]['x'], t4.iloc[0]['y'], t4.iloc[0]['z']]
+                            print(f'estimated position {s_point, s_point.shape}')
                             estimation_error = distance.euclidean(gt_point, s_point)
                             cont = False
                             write_result = False
@@ -263,15 +278,21 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                             # ALSO
                             # https://stackoverflow.com/q/66268893/4955732
                             # Giray suspects this clause could be deleted.
+                            
+                            # Now TB suspects Giray was using the camera xyz
+                            # and so of course ran into issues when Z <= 0!
+                            # This has now been replaced into the world xyz
+                            # and z_2 replaced by y_2
+                            x_2, y_2, z_2 = s_point
                             if z_2 > 0.0:
 
-                                if do_kalman_filter_predictions and i > config.kf_frame_required * 2:
+                                if do_kalman_filter_predictions and i > kf_frame_required * 2:
                                     # forward pass of kalman prediction
-                                    x, y, z, k_cal_counter = kalman_functions.kalman_predict(pre_id_1, fn, "recon2", False)
-                                    if config.reverse_kf:
+                                    x, y, z, k_cal_counter = kalman_predict(pre_id_1, fn, "recon2", False)
+                                    if reverse_kf:
                                         # reverse pass of kalman prediction - requires a pre-existing 
                                         # result file
-                                        x2_kf, y2_kf, z2_kf, k_cal_counter2_kf = kalman_functions.kalman_predict(pre_id_1, fn, "recon2", True)
+                                        x2_kf, y2_kf, z2_kf, k_cal_counter2_kf = kalman_predict(pre_id_1, fn, "recon2", True)
                                         if k_cal_counter > k_cal_counter2_kf: # if available frame of forward run > reverse run
                                             pass
                                         else:
@@ -300,13 +321,13 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                                             # write_result = False
                                             cont = False
                                             ignore_candidate = False
-                                            if k_cal_counter <= config.kf_frame_required:
+                                            if k_cal_counter <= kf_frame_required:
                                                 # write_result = True
                                                 pass
                                     # check that both one-way and two-way epipolar line
                                     # distances of the points are within a threshold. 
                                     # Here the threshold is hard-coded to 50 pixels.
-                                    if config.kf_frame_required >= k_cal_counter and not epipolar_distance_check:
+                                    if kf_frame_required >= k_cal_counter and not epipolar_distance_check:
                                         if abs(pre_min_1) < 50 and abs(pre_min_2) < 50:
                                             write_result = True
                                             ignore_candidate = False
@@ -317,7 +338,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                                                 ignore_candidate = True
                                                 candidate_id_to_ignore = pre_id_1
                                                 cont = True
-                                if i <= config.kf_frame_required * 2:
+                                if i <= kf_frame_required * 2:
                                     write_result = True
                                 if not do_kalman_filter_predictions:
                                     write_result = True
@@ -343,15 +364,8 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                                         fcounter += 1
                                     ccount += 1
 
-                                if do_kalman_filter_predictions and not config.multi_run:
-                                    df_recon.to_csv(f"result_files/{result_file_name}.csv", index=False)
-                                # kalman filling Not implemented 
-                                if call_kalman_fill:
-                                    kalman_functions.kalman_fill("recon1", 10, i)
-                                    call_kalman_fill = False
-                                    path_to_check_1 = Path(f"result_files/{result_file_name}.csv")
-                                    if path_to_check_1.exists():
-                                        df_recon = pd.read_csv(path_to_check_1)
+                                if do_kalman_filter_predictions and not multi_run:
+                                    df_recon.to_csv(f'{result_file_name}_{yyyymmdd}.csv', index=False)
 
                                 avg_ee += estimation_error
                                 # print(res_tr)
@@ -373,7 +387,8 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                         cont = False
                 else:
                     cont = False
-    df_recon.to_csv(f"result_files/{result_file_name}.csv", index=False)
+   
+    df_recon.to_csv(f"{result_file_name}_{yyyymmdd}.csv", index=False)
     # report all the performance diagnostics
     if (scounter + fcounter) > 0 and run_len != 0:
         print("Matching trajectory performance: " + str(scounter / (scounter + fcounter)) + " Scounter = " +

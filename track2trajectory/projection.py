@@ -4,7 +4,6 @@ import cv2
 import pandas as pd
 import track2trajectory.camera as camera
 
-
 def calcFundamentalMatrix(camera_1, camera_2):
     '''
     Calculates the fundamental matrix that transforms 2D points on camera 1
@@ -98,8 +97,8 @@ def project_to_2d_and_3d(gt_3d_df, camera_obj: camera.Camera,
         # MAKE SENSE.
         # Set values & add noise. 
         x_temp = gt_3d_df.iloc[i]['x'] + noise3d[0]
-        y_temp = gt_3d_df.iloc[i]['z'] + noise3d[1]
-        z_temp = gt_3d_df.iloc[i]['y'] + noise3d[2]
+        y_temp = gt_3d_df.iloc[i]['z'] + noise3d[2]
+        z_temp = gt_3d_df.iloc[i]['y'] + noise3d[1]
         frame_temp = gt_3d_df.iloc[i]['frame']
 
         oid = gt_3d_df.iloc[i]['oid']
@@ -132,3 +131,23 @@ def project_to_2d_and_3d(gt_3d_df, camera_obj: camera.Camera,
                                                          "cid": cid}))
 
     return proj_2d_df.reset_index(drop=True), fail_counter
+
+def triangulate_points_in3D(point1, point2, camera1, camera2):
+    '''
+    Parameters
+    ----------
+    point1, point2 : (2,) np.array with np.float32 entries
+    camera1, camera2 : camera.Camera instances
+    
+    Returns
+    -------
+    xyz_world : (3,) np.array with np.float32 entries
+
+    '''
+    tri_res = cv2.triangulatePoints(camera1.cm_mtrx, camera2.cm_mtrx,
+                                    point1.reshape(-1,1), point2.reshape(-1,1))
+
+    xyz_camera = cv2.convertPointsFromHomogeneous(tri_res.T).flatten()
+    xyz_world = np.float32([xyz_camera[0], xyz_camera[2], xyz_camera[1]])
+    return xyz_world
+    

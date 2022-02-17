@@ -49,8 +49,9 @@ class Camera:
         rel_pos : TYPE
             DESCRIPTION.
         cm_mtrx : 3x4 np.array
-            Camera matrix with the rotation (3x3) and translation matrix (3x1)
-            column stacked.
+            Projection matrix, this is the intrinsic matrix X R matrix
+            where the R matrix is the 3x4 matrix made of the 3x3 rotation 
+            matrix and the translation (3x1) matrix 
 
         '''
         self.id = c_id # camera ID
