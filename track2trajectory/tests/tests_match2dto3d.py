@@ -19,7 +19,7 @@ class TestFindCandidateWorks(unittest.TestCase):
         in both cameras. 
         '''
         self.cam1, self.cam2 = syndata.generate_two_synthetic_cameras_version2()
-        x_range = np.linspace(-0.5,0.5,3)
+        x_range = np.tile(0,3)
         y_range = np.linspace(10,20,3)
         z_range = np.linspace(-1,1,4)
         all_points = np.array(np.meshgrid(x_range, y_range, z_range)).T.reshape(-1, 3)
@@ -79,24 +79,35 @@ class TestEstimate3DPoints(unittest.TestCase):
         '''Generate 2 synthetic cameras with multiple objects in the field of view
         '''
         self.cam1, self.cam2 = syndata.generate_two_synthetic_cameras_version2()
+        x_range = np.linspace(-0.5,0.5,2)
+        y_range = np.linspace(5,10,2)
+        z_range = np.linspace(-1,1,2)
+        
+        threed_data = np.array(np.meshgrid(x_range, y_range, z_range)).T.reshape(-1, 3)
+        self.points_in_3d = pd.DataFrame(data={'x':threed_data[:,0],
+                                               'y':threed_data[:,1],
+                                               'z':threed_data[:,2],
+                                               'frame':np.tile(1, threed_data.shape[0]),
+                                               'oid':np.arange(threed_data.shape[0])})
 
-        x,y,z = np.tile(0,10), np.random.normal(10,1,10), np.random.normal(0,1,10)
-        self.points_in_3d = pd.DataFrame(data={'x':x,'y':y,'z':z,'frame':np.tile(1, x.size),
-                                          'oid':np.arange(10)})
-
-        self.fundamental_matrix = projection.calcFundamentalMatrix(self.cam1, self.cam2)
-        self.cam1_2dpoints, cam1_fails = projection.project_to_2d_and_3d(self.points_in_3d,
-                                                                         self.cam1)
-        self.cam2_2dpoints, cam2_fails  = projection.project_to_2d_and_3d(self.points_in_3d,
-                                                                          self.cam2)
+        self.all_2dpoints = self.make_2dprojection_data(self.points_in_3d)
         self.fundamatrix_cam2fromcam1 = projection.calcFundamentalMatrix(self.cam1, self.cam2)
-        self.all_2dpoints = pd.concat([self.cam1_2dpoints,
-                                       self.cam2_2dpoints]).reset_index(drop=True)
+       
+    def make_2dprojection_data(self, points_in_3d):
+        
+        cam1_2dpoints, cam1_fails = projection.project_to_2d_and_3d(points_in_3d,
+                                                                         self.cam1)
+        cam2_2dpoints, cam2_fails  = projection.project_to_2d_and_3d(points_in_3d,
+                                                                          self.cam2)
+        all_2dpoints = pd.concat([cam1_2dpoints,
+                                  cam2_2dpoints]).reset_index(drop=True)
+        return all_2dpoints
 
     def test_doesEstimate3DPointsRun(self):
         '''
         No Kalman filtering yet here
         '''
+        
         print('...........miaow')
         output = m2d3d.estimate_3d_points(self.cam1, self.cam2, 
                                  self.all_2dpoints, self.points_in_3d,

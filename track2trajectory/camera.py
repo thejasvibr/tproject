@@ -1,6 +1,6 @@
 '''
-Camera module
-=============
+Camera
+=======
 Contains the Camera class
 '''
 

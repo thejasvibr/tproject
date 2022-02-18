@@ -158,6 +158,11 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
     References 
     ----------
     * Giray's Master Thesis
+    
+    See Also
+    --------
+    camera.Camera
+    
     '''
     kf_distance_threshold = kwargs.get('kf_distance_threshold', 0.3) # metres
     do_kalman_filter_predictions = kwargs.get('do_kalman_filter_predictions', True)
@@ -166,8 +171,8 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
     multi_run = kwargs.get('multi_run', False)
     # save df with timestamp
     yyyymmdd = dt.datetime.now().strftime('%Y-%m-%d')
-    
-    
+
+
     df_2d = df_2d.sort_values('frame')
     df_t = df_2d.loc[df_2d['cid'] == camera1.id] # trajectories cam 1
     df_t_2 = df_2d.loc[df_2d['cid'] == camera2.id] # trajectores cam 2
@@ -176,7 +181,8 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
 
     # Benchmark values
     # see Sections 3.2-3.3 in Giray's thesis for more background
-    df_recon = pd.DataFrame(columns=["frame", "gtoid", "oid_1", "oid_2", "x", "y", "z", "dt1", "dt2", "dt3"])
+    df_recon = pd.DataFrame(columns=["frame", "gtoid", "oid_1", "oid_2",
+                                     "x", "y", "z", "dt1", "dt2", "dt3"])
     scounter = 0 # successful pairings
     fcounter = 0 # failed pairings  
     ccount = 0 # Sum total of all points across all frames in Camera 1
@@ -222,8 +228,9 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                             temp_c2.loc[(np.isclose(temp_c2['oid'], candidate_id_to_ignore, 0.0001))].index)
                     ignore_candidate = False
                 dist_2_points = -1
-                cand_p_1, pre_min_1, pre_frame_1, pre_id_1, row_num1 = find_candidate(temp_c2, outfm, camera2,
-                                                                                      camera1, temp_p)
+                candidate_output1 = find_candidate(temp_c2, outfm,
+                                                   camera2, camera1, temp_p)
+                cand_p_1, pre_min_1, pre_frame_1, pre_id_1, row_num1 = candidate_output1
 
                 if len(cand_p_1) != 0:
                     temp_c1 = at_frame_c1.copy()
@@ -231,8 +238,9 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                     cp1 = np.float32([cand_p_1[0], cand_p_1[1]])
                     # the 'two-way authentication' is done here. The epipolar of the 'best point' in Cam 2 is 
                     # is the projected onto Cam 1 - and the point closest to this epipolar is checked.
-                    cand_p_2, pre_min_2, pre_frame_2, pre_id_2, row_num1 = find_candidate(temp_c1, outfm, camera1,
-                                                                                          camera2, cp1)
+                    candidate_output2 = find_candidate(temp_c1, outfm, camera1,
+                                                       camera2, cp1)
+                    cand_p_2, pre_min_2, pre_frame_2, pre_id_2, row_num1 = candidate_output2
 
                     if len(cand_p_2) != 0:
                         # check that the '2-way auth' point on Cam1 is the same as the original 
@@ -261,14 +269,13 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                             t2 = df_3d_gt.loc[np.float32(df_3d_gt['frame']) == np.float32(t1)]
                             t4 = t2.loc[np.float32(t2['oid']) == oid_f]
 
-                            # s_point = [x_2, y_2, z_2] # estimated xyz position
 
                             gtx = t4.iloc[0]['x']
                             gty = t4.iloc[0]['y']
                             gtz = t4.iloc[0]['z']
 
                             gt_point = [t4.iloc[0]['x'], t4.iloc[0]['y'], t4.iloc[0]['z']]
-                            print(f'estimated position {s_point, s_point.shape}')
+
                             estimation_error = distance.euclidean(gt_point, s_point)
                             cont = False
                             write_result = False
@@ -281,8 +288,7 @@ def estimate_3d_points(camera1, camera2, df_2d: pd, df_3d_gt, result_file_name, 
                             
                             # Now TB suspects Giray was using the camera xyz
                             # and so of course ran into issues when Z <= 0!
-                            # This has now been replaced into the world xyz
-                            # and z_2 replaced by y_2
+                            # Needs to be replaced with y_2>0??
                             x_2, y_2, z_2 = s_point
                             if z_2 > 0.0:
 

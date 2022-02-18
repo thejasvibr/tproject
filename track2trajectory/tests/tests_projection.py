@@ -11,6 +11,8 @@ import track2trajectory.projection as projection
 import track2trajectory.synthetic_data as syndata
 from scipy.spatial.transform import Rotation as R
 
+
+
 class Check2DProjectionWorks(unittest.TestCase):
     
     def setUp(self):
@@ -77,8 +79,30 @@ class CheckFundamentalMatrixCalculationWorks(unittest.TestCase):
                                                               self.camera2)
 
 
+class TestFundamentalMatrixCalculation(unittest.TestCase):
+    '''Check if the output fundamental matrix makes mathematical sense
+    The expected relations satisfied by the fundamental matrix are on page 246 of 
+    Hartley & Zisserman 2003
+    '''
+    def setUp(self):
+        cam1, cam2 = syndata.generate_two_synthetic_cameras_version2()
+        self.F = projection.calcFundamentalMatrix(cam1, cam2)
         
+            
+        C = np.matmul(-np.linalg.inv(cam1.cm_mtrx[:3,:3]), cam1.cm_mtrx[:,-1])
+        C = np.concatenate((C, np.array([1])))
+        P_prime = cam2.cm_mtrx
+        self.e_prime = np.matmul(P_prime, C)
+        
+        Cprime = np.matmul(-np.linalg.inv(cam2.cm_mtrx[:3,:3]), cam2.cm_mtrx[:,-1])
+        Cprime = np.concatenate((Cprime, np.array([1])))
+        P = cam1.cm_mtrx
+        self.e = np.matmul(P, Cprime)
 
+    def test_epipole_relations(self):
+        epipole_condition1 = np.matmul(self.F.T, self.e)==0
+        epipole_condition2 = np.matmul(self.F.T, self.e_prime)==0
+        self.assertTrue(np.all([epipole_condition1, epipole_condition2]))
 
 
 if __name__ == '__main__':

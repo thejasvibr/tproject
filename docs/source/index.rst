@@ -57,6 +57,16 @@ Conception and history
 The original code and research for this project was written by Giray Tandogan as part of a Bachelor's Thesis at the University of Konstanz. The project was supervised by Hemal Naik, and Thejasvi Beleyur. Thejasvi Beleyur is currently working
 on refactoring Giray's code to make it into an installable package of general interest.
 
+
+Code docs
+=========
+
+.. toctree::
+   :maxdepth:1
+   :caption: API reference:
+
+   API_track2trajectory.rst
+
 Indices and tables
 ==================
 
