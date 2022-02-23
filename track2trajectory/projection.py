@@ -19,7 +19,7 @@ def calcFundamentalMatrix(camera_1, camera_2):
     Where:
 
     * :math:`[e']_{x}` is the skew-symmetric matrix from e
-    * :math: `e'` is the epipole, obtained by :math:`e' = P' C`, where C is the camera1 centre
+    * :math:`e'` is the epipole, obtained by :math:`e' = P' C`, where :math:`C` is the camera1 centre
     * :math:`P'` is the projection matrix of camera 2
     * :math:`P^{+}` is the pseudo-inverse of camera 1's projection matrix
 
@@ -30,37 +30,39 @@ def calcFundamentalMatrix(camera_1, camera_2):
     Returns
     -------
     F : 3x3 np.array 
-        2D array with the fundamental matrix. The fundamental matrix maps 
-        any points Xi on camera 1 onto Xj on camera 2
+        2D array with the fundamental matrix. 
 
     Notes
     -----                      
-    The fundamental matrix is a 3X3 matrix which maps a point on cam1 onto the corresponding
-    epipolar line on camera 2. 
-    
+    The fundamental matrix is a 3X3 matrix which maps a point on cam1 onto the
+    corresponding point on cam2
+
     References
     ----------
     * pg. 246 and pg 581 of Hartley & Zisserman 2003
-    
+
     See Also
     --------
     make_skew_symmetric_matrix
     '''
-    
+    # M is defined on pg 161 as 'the first 3x3 submatrix of P'
+    M = camera_1.cm_mtrx[:3,:3]
+    p4 = camera_1.cm_mtrx[:,-1]
     # Calculating camera centre C on page 158
-    C_inhomog = np.matmul(-np.linalg.inv(camera_1.cm_mtrx[:3,:3]),
-                          camera_1.cm_mtrx[:,-1])
+    C_inhomog = -np.matmul(np.linalg.inv(M),p4)
     C = np.concatenate((C_inhomog, np.array([1]))).flatten() # make homogeneous
 
-    P = camera_1.cm_mtrx
+
     P_prime = camera_2.cm_mtrx
     e_prime = np.matmul(P_prime, C)
     e_prime_cross = make_skew_symmetric_matrix(e_prime)
 
-        
     # P+ is the pseudo inverse of P 
-    P_plus = np.linalg.pinv(P)
+    P = camera_1.cm_mtrx
+    # assert that PC = 0 
+    assert np.allclose(np.matmul(P,C), [0,0,0],atol=1e-5)
     
+    P_plus = np.linalg.pinv(P)
     Pprime_Pplus = np.matmul(P_prime, P_plus)
     F = np.matmul(e_prime_cross, Pprime_Pplus)
     return F
@@ -172,12 +174,14 @@ def make_skew_symmetric_matrix(a):
     '''
 
     if a is a vector with a = (a1, a2, a3)
-    then the skew-matrix of a, called [a]_{x}
-    is
-
-         | 0 |  -a3|  a2 |
-         |a3 |   0 |  -a1|
-        |-a2 | a1  |   0 |
+    then the skew-matrix of a, called :math:`[a]_{x}`
+    is:
+    
+    ::
+    
+         | 0  |  -a3| a2 |
+         | a3 |   0 | -a1|
+         |-a2 |  a1 |  0 |
 
     Parameters
     ----------

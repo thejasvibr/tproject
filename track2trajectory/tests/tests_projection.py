@@ -85,24 +85,68 @@ class TestFundamentalMatrixCalculation(unittest.TestCase):
     Hartley & Zisserman 2003
     '''
     def setUp(self):
-        cam1, cam2 = syndata.generate_two_synthetic_cameras_version2()
-        self.F = projection.calcFundamentalMatrix(cam1, cam2)
+        self.cam1, self.cam2 = syndata.generate_two_synthetic_cameras_version2()
+        self.F = projection.calcFundamentalMatrix(self.cam1, self.cam2)
+
+        self.C = np.matmul(-np.linalg.inv(self.cam1.cm_mtrx[:3,:3]),
+                                                   self.cam1.cm_mtrx[:,-1])
+        self.C = np.concatenate((self.C, np.array([1])))
+        self.P_prime = self.cam2.cm_mtrx
+        self.e_prime = np.matmul(self.P_prime, self.C)
         
-            
-        C = np.matmul(-np.linalg.inv(cam1.cm_mtrx[:3,:3]), cam1.cm_mtrx[:,-1])
-        C = np.concatenate((C, np.array([1])))
-        P_prime = cam2.cm_mtrx
-        self.e_prime = np.matmul(P_prime, C)
-        
-        Cprime = np.matmul(-np.linalg.inv(cam2.cm_mtrx[:3,:3]), cam2.cm_mtrx[:,-1])
-        Cprime = np.concatenate((Cprime, np.array([1])))
-        P = cam1.cm_mtrx
-        self.e = np.matmul(P, Cprime)
+        self.Cprime = np.matmul(-np.linalg.inv(self.cam2.cm_mtrx[:3,:3]), 
+                           self.cam2.cm_mtrx[:,-1])
+        self.Cprime = np.concatenate((self.Cprime, np.array([1])))
+        self.P = self.cam1.cm_mtrx
+        self.e = np.matmul(self.P, self.Cprime)
+
+    def test_PC_relations(self):
+        PCisZero = np.all(np.matmul(self.P, self.C)==0)
+        primePCisZero = np.all(np.matmul(self.P_prime, self.Cprime)==0)
+        self.assertTrue(np.all([PCisZero, primePCisZero]))
 
     def test_epipole_relations(self):
-        epipole_condition1 = np.matmul(self.F.T, self.e)==0
+        '''
+        Fe = 0
+        
+        and 
+        
+        F.T e' = 0
+        '''
+        epipole_condition1 = np.matmul(self.F, self.e)==0
+        print(f'epipole_condition1 values: {np.matmul(self.F, self.e)}')
         epipole_condition2 = np.matmul(self.F.T, self.e_prime)==0
         self.assertTrue(np.all([epipole_condition1, epipole_condition2]))
+
+    def make_homog(self,X):
+        return np.concatenate((X.flatten(), np.array([1]))).flatten()
+
+    def test_xprime_Fx_relation(self):
+        '''
+        '''
+        threed_data = np.array(([0,10,0],
+                              [-1,9,-1])).reshape(-1,3)
+        points_in_3d = pd.DataFrame(data={'x':threed_data[:,0],
+                                               'y':threed_data[:,1],
+                                               'z':threed_data[:,2],
+                                               'frame':np.tile(1, threed_data.shape[0]),
+                                               'oid':np.arange(threed_data.shape[0])})
+
+        cam1_2dpoints, _ = projection.project_to_2d_and_3d(points_in_3d,
+                                                               self.cam1)
+        cam2_2dpoints, _ = projection.project_to_2d_and_3d(points_in_3d,
+                                                               self.cam2)
+
+        xy_cam1 = cam1_2dpoints.loc[0,['x','y']].to_numpy()
+        X = self.make_homog(xy_cam1)
+        xy_cam2 = cam2_2dpoints.loc[0,['x','y']].to_numpy()
+        Xprime = self.make_homog(xy_cam2)
+        
+        print(np.matmul(np.matmul(Xprime.T,self.F), X))
+        make_homog = lambda X : np.concatenate((X.flatten(), np.array([1]))).flatten()
+        print(cam2_2dpoints)
+        
+        
 
 
 if __name__ == '__main__':
