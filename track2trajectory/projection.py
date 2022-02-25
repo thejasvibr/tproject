@@ -45,6 +45,9 @@ def calcFundamentalMatrix(camera_1, camera_2):
     --------
     make_skew_symmetric_matrix
     '''
+    if not camera_1.id < camera_2.id:
+        ValueError(f'Camera 1 ID: {camera_1.id} is > Camera 2 ID: {camera_2.id}.\
+                   For calcFundamentalMatrix Camera 1 ID must be < Camera 2 ID')
     # M is defined on pg 161 as 'the first 3x3 submatrix of P'
     M = camera_1.cm_mtrx[:3,:3]
     p4 = camera_1.cm_mtrx[:,-1]
@@ -52,16 +55,18 @@ def calcFundamentalMatrix(camera_1, camera_2):
     C_inhomog = -np.matmul(np.linalg.inv(M),p4)
     C = np.concatenate((C_inhomog, np.array([1]))).flatten() # make homogeneous
 
-
     P_prime = camera_2.cm_mtrx
     e_prime = np.matmul(P_prime, C)
     e_prime_cross = make_skew_symmetric_matrix(e_prime)
 
     # P+ is the pseudo inverse of P 
     P = camera_1.cm_mtrx
-    # assert that PC = 0 
-    assert np.allclose(np.matmul(P,C), [0,0,0],atol=1e-5)
-    
+
+    # Check that PC = 0 
+    if not np.allclose(np.matmul(P,C), [0,0,0],atol=1e-6):
+        raise ValueError('PC condition not satisfied.\
+                         Check camera_1 projection matrix...')
+
     P_plus = np.linalg.pinv(P)
     Pprime_Pplus = np.matmul(P_prime, P_plus)
     F = np.matmul(e_prime_cross, Pprime_Pplus)
@@ -88,8 +93,11 @@ def project_to_2d_and_3d(gt_3d_df, camera_obj: camera.Camera,
         2D noise standard deviation (post projection). Default 0
     mu3d : float, optional
         3D noise mean pre-projection. Default 0
+        The same mean is applied to x,y,z.
+        i.e. x + N(mu3d, sigma3d), y+ N(mu3d,sigma3d), z+ N(mu3d, sigma3d)
     sigma3D : float, optional
         3D noise standard deviation pre-projection. Default 0
+        The same sigma is applied to x,y,z
 
     Returns
     -------

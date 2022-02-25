@@ -10,6 +10,8 @@ track2trajectory API
 .. automodule:: track2trajectory.synthetic_data
        :members: generate_three_synthetic_cameras, generate_two_synthetic_cameras_version2, make_rotation_mat_fromworld, make_focal_mat, get_cam_coods
 
-.. automodule:: track2trajectory.match2dto3d
-       :members: orthogonal_distance, find_candidate, find_candidate_v2, estimate_3d_points
-	   
+.. automodule:: track2trajectory.match2d
+       :members: find_candidate, find_candidate_v2
+
+.. automodule:: track2trajectory.match3d
+	   :members: estimate_3d_points

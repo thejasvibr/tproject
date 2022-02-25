@@ -15,8 +15,52 @@ import tqdm
 import datetime as dt
 from track2trajectory.prediction import kalman_predict
 from track2trajectory.projection import triangulate_points_in3D
+from track2trajectory.match2d import generate_2d_correspondences
 
-import pdb
+
+def match_2dpoints_to_3dtrajectories(camera1, camera2, cam1_2dpoints, cam2_2dpoints,
+                                     fundamental_matrix, **kwargs):
+    '''
+    Parameters
+    ----------
+    camera1,camera2: camera.Camera instances
+    cam1_2dpoints, cam2_2dpoints : pd.DataFrame
+        Dataframe with columns: :code:`frame, x, y, oid, cid` with 2D point 
+        data for each camera.
+    fundamental_matrix : (3,3) np.array
+        Fundamental matrix which maps points from cam1 to cam2.
+    
+    Returns 
+    -------
+    matched_trajectories : pd.DataFrame
+        With columns :code:`frame,traj_id, x, y, z, c1_oid, c2_oid`
+    
+    See Also
+    --------
+    projection.generate_2d_correspondences
+    
+    
+    '''
+    twocam_matches, failed_2dmatches = generate_2d_correspondences(camera1, camera2,
+                                                       cam1_2dpoints,
+                                                       cam2_2dpoints,
+                                                       fundamental_matrix,
+                                                       **kwargs)
+    # run a check to see if there are repeat matches in the 2D correspondences
+    
+    # Generate 3D projections of all matched points
+    
+    # Form heuristic trajectory labels based on co-occurence of 2d point labels
+    
+    # Run Kalman filtering if required to test correspondence matches and 
+    # fill in the gaps 
+    
+    
+
+
+
+
+
 
 
 def estimate_3d_points(camera1, camera2, all_2d_points: pd, all_3d_groundtruth, result_file_name,
@@ -123,8 +167,7 @@ def estimate_3d_points(camera1, camera2, all_2d_points: pd, all_3d_groundtruth, 
 
     for i in tqdm.trange(run_len):
 
-        current_point_cam1 = np.float32([cam1_2d_points.iloc[i]['x'],
-                                         cam1_2d_points.iloc[i]['y']])
+        current_point_cam1 = np.float32(cam1_2d_points.loc[i,['x','y']])
         print(f'i:{i}, current_point_cam1:{current_point_cam1} \n')
 
         # Get proper frame values for comparison.
@@ -160,40 +203,37 @@ def estimate_3d_points(camera1, camera2, all_2d_points: pd, all_3d_groundtruth, 
                 ignore_candidate = False
             dist_2_points = -1
             print(f'\n temp_c2: {temp_c2} \n')
-            candidate_output1 = find_candidate(temp_c2, fundamental_matrix,
+            candidate_output1 = find_candidates(temp_c2, fundamental_matrix,
                                                camera2, camera1, current_point_cam1)
-            #pdb.set_trace()
-            cand_p_1, pre_min_1, pre_frame_1, pre_id_1, row_num1 = candidate_output1
-            print(f'candidate_p1:{cand_p_1}')
-            if not len(cand_p_1) != 0:
+            if not len(candidate_output1) != 0:
                 continue 
             temp_c1 = at_frame_c1.copy() # all points on camera 1 at the current frame
 
             # the 'two-way authentication' is done here. The epipolar of the 'best point' in Cam 2 is 
             # is the projected onto Cam 1 - and the point closest to this epipolar is checked.
-            candidate_output2 = find_candidate(temp_c1, fundamental_matrix, camera1,
-                                                                   camera2, cand_p_1)
-            cand_p_2, pre_min_2, pre_frame_2, pre_id_2, row_num1 = candidate_output2
+            candidate_output2 = find_candidates(temp_c1, fundamental_matrix,
+                                               camera1, camera2, candidate_output1)
 
-            if not len(cand_p_2) != 0:
+            if not len(candidate_output2) != 0:
                 cont = False
                 continue
             # check that the '2-way auth' point on Cam1 is the same as the original 
             # candidate point
-            print('delta: ',current_point_cam1[0]-cand_p_2[0],
-                  current_point_cam1[1]-cand_p_2[1])
-            if (np.isclose(current_point_cam1[0], cand_p_2[0], atol=0.0001) and
-                    np.isclose(current_point_cam1[1], cand_p_2[1], atol=0.0001)):
+            print(f'currentpointcam1: {current_point_cam1}\n candidate_output2: {candidate_output2}')
+            print('delta: ',current_point_cam1[0]-candidate_output2[0],
+                  current_point_cam1[1]-candidate_output2[1])
+            if (np.isclose(current_point_cam1[0], candidate_output2[0], atol=0.0001) and
+                    np.isclose(current_point_cam1[1], candidate_output2[1], atol=0.0001)):
                 # print("Successful match")
                 
-                candp2 = cv2.undistortPoints(cand_p_2, camera1.i_mtrx,
+                candp2 = cv2.undistortPoints(candidate_output2, camera1.i_mtrx,
                                              camera1.cof_mtrx,
                                              P=camera1.i_mtrx)
-                candp1 = cv2.undistortPoints(cand_p_1, camera2.i_mtrx,
+                candp1 = cv2.undistortPoints(candidate_output1, camera2.i_mtrx,
                                              camera2.cof_mtrx,
                                              P=camera2.i_mtrx)
                 
-                s_point = triangulate_points_in3D(candp2, candp1, 
+                s_point = triangulate_points_in3D(candidate_output2, candidate_output1, 
                                                   camera1, camera2,
                                                              )
                 # Get groun truth 3D value.
@@ -338,15 +378,24 @@ def estimate_3d_points(camera1, camera2, all_2d_points: pd, all_3d_groundtruth, 
 
     return avg_ee, -1
 
+
+def match3d_using_2way_projection(camera1, camera2, all_2d_points: pd, 
+                                      fundamental_matrix,
+                                          **kwargs):
+    '''
+    Does 2-way projection to match points
+    
+    '''
+    pass
+    
+    
+
 if __name__ == '__main__':
+    pass
     # test the fundamental camera relation
    
     # output = estimate_3d_points(cam1, cam2, 
     #                          all_2dpoints, points_in_3d,
     #                          'output_testresuts', fundamatrix_cam2fromcam1,
     #                          do_kalman_filter_predictions=True)
-
-                                                                     
-                                                                     
-                                                                     
                                                                      

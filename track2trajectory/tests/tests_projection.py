@@ -10,7 +10,7 @@ import unittest
 import track2trajectory.projection as projection
 import track2trajectory.synthetic_data as syndata
 from scipy.spatial.transform import Rotation as R
-
+from track2trajectory import make_homog
 
 
 class Check2DProjectionWorks(unittest.TestCase):
@@ -113,13 +113,12 @@ class TestFundamentalMatrixCalculation(unittest.TestCase):
         
         F.T e' = 0
         '''
-        epipole_condition1 = np.matmul(self.F, self.e)==0
-        print(f'epipole_condition1 values: {np.matmul(self.F, self.e)}')
-        epipole_condition2 = np.matmul(self.F.T, self.e_prime)==0
-        self.assertTrue(np.all([epipole_condition1, epipole_condition2]))
+        epipole_condition1 = np.matmul(self.F, self.e)
+        condition1_satisfied = np.allclose(epipole_condition1, [0,0,0], atol=1e-6)
+        epipole_condition2 = np.matmul(self.F.T, self.e_prime)
+        condition2_satisfied = np.allclose(epipole_condition2, [0,0,0], atol=1e-6)
+        self.assertTrue(np.all([condition1_satisfied, condition2_satisfied]))
 
-    def make_homog(self,X):
-        return np.concatenate((X.flatten(), np.array([1]))).flatten()
 
     def test_xprime_Fx_relation(self):
         '''
@@ -138,16 +137,13 @@ class TestFundamentalMatrixCalculation(unittest.TestCase):
                                                                self.cam2)
 
         xy_cam1 = cam1_2dpoints.loc[0,['x','y']].to_numpy()
-        X = self.make_homog(xy_cam1)
+        X = make_homog(xy_cam1)
         xy_cam2 = cam2_2dpoints.loc[0,['x','y']].to_numpy()
-        Xprime = self.make_homog(xy_cam2)
-        
-        print(np.matmul(np.matmul(Xprime.T,self.F), X))
-        make_homog = lambda X : np.concatenate((X.flatten(), np.array([1]))).flatten()
-        print(cam2_2dpoints)
-        
-        
+        Xprime = make_homog(xy_cam2)
 
+        xprime_F_x = np.matmul(np.matmul(Xprime.T,self.F), X)
+        xprimeFx_closetozero = abs(xprime_F_x) < 1e-9
+        self.assertTrue(xprimeFx_closetozero)
 
 if __name__ == '__main__':
     unittest.main()

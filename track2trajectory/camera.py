@@ -67,4 +67,4 @@ class Camera:
         self.cof_mtrx = np.float32(cof_mtrx) # distortion coefficient matrix
         self.fmm = np.float32(f * 0.00576 / 1920.0) # focal length in mm (is calculated independently if not provided)
         self.rel_pos = np.float32(rel_pos)
-        self.cm_mtrx = np.float32(cm_mtrx) # camera matrix
+        self.cm_mtrx = np.float64(cm_mtrx) # camera matrix
