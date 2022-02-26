@@ -6,9 +6,11 @@
 
 import cv2
 import numpy as np 
+import pandas as pd
 import track2trajectory
 import track2trajectory.camera as camera
 from track2trajectory import get_closest_points
+import tqdm
 make_homog = track2trajectory.make_homog
 
 def generate_2d_correspondences(camera1, camera2, cam1_2dpoints, cam2_2dpoints,
@@ -35,20 +37,18 @@ def generate_2d_correspondences(camera1, camera2, cam1_2dpoints, cam2_2dpoints,
 
     Returns
     -------
-    correspondences : dict
-        Dictionary with keys in format: `frame_{frame-number}_c1_oid_{cam1-oid}`
-        and values in format: `c2_oid_{cam2-oid}`. Each point across each frame
-        in :code:`cam1_2dpoints` will have a corresponding point on Camera 2
-        when succesfully matched. If no match was found for a point on camera 1 
-        then it is assigned a 'np.nan' value.
+    correspondences : pd.DataFrame
+        A dataframe with columns :code:`frame, c1_oid, c2_oid`.
+        If no match was found for a point on camera 1 then it is assigned a
+        'np.nan' value.
     failed_matches_cam1 : int 
         The number of points that couldn't be matched
-    
+
     References
     ----------
     * Tandogan, Giray, 2022, 3D Trajectory Reconstruction for Animal Data, Master's
     thesis (Uni. Konstanzt), page 9
-   
+       
     See Also
     --------
     projection.calcFundamentalMatrix
@@ -58,7 +58,7 @@ def generate_2d_correspondences(camera1, camera2, cam1_2dpoints, cam2_2dpoints,
     '''
     failed_matches_cam1 = 0
     correspondences = {}
-    for rownum in range(cam1_2dpoints.shape[0]):
+    for rownum in tqdm.trange(cam1_2dpoints.shape[0]):
         framenum = cam1_2dpoints.loc[rownum,'frame']
         
         at_frame_c1 = cam1_2dpoints[cam1_2dpoints['frame']==framenum]
@@ -98,7 +98,19 @@ def generate_2d_correspondences(camera1, camera2, cam1_2dpoints, cam2_2dpoints,
                 c2oid = cam2_on_frame_row['oid'].tolist()[0]
                 correspondences[f'frame_{framenum}_c1_oid_{c1oid}'] = f'c2_oid_{c2oid}'
 
-    return correspondences, failed_matches_cam1
+    correspondece_data = pd.DataFrame(columns=['frame','c1_oid','c2_oid'], 
+                                      index=np.arange(len(correspondences)))
+    
+    for i,(key, value) in enumerate(correspondences.items()):
+        parts = key.split('_')
+        match = value.split('_')
+        correspondece_data.loc[i, 'frame'] = parts[1]
+        correspondece_data.loc[i, 'c1_oid'] = parts[-1]
+        correspondece_data.loc[i, 'c2_oid'] = match[-1]
+    
+    # Run check to see if there are repeat assignments of Cam 2 points
+       
+    return correspondece_data, failed_matches_cam1
 
 def find_candidates(all_2d_points_camera2, fund_matrix, camera1: camera.Camera,
                    camera2: camera.Camera, source_point, **kwargs):

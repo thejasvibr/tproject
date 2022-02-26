@@ -45,11 +45,10 @@ def match_2dpoints_to_3dtrajectories(camera1, camera2, cam1_2dpoints, cam2_2dpoi
                                                        cam1_2dpoints,
                                                        cam2_2dpoints,
                                                        fundamental_matrix,
-                                                       **kwargs)
-    # run a check to see if there are repeat matches in the 2D correspondences
-    
+                                                       **kwargs)    
     # Generate 3D projections of all matched points
-    
+    matched_xyz = get_3d_positions_from2dmatches(twocam_matches, camera1, camera2)
+
     # Form heuristic trajectory labels based on co-occurence of 2d point labels
     
     # Run Kalman filtering if required to test correspondence matches and 
@@ -57,6 +56,47 @@ def match_2dpoints_to_3dtrajectories(camera1, camera2, cam1_2dpoints, cam2_2dpoi
     
     
 
+def get_3d_positions_from2dmatches(matches_2d, cam1_2dpoints, cam2_2dpoints, camera1, camera2):
+    '''
+    Parameters
+    ----------
+    matches_2d : pd.DataFrame
+        Dataframe with columns :code:`frame, c1_oid, c2_oid`
+    camera1, camera2 : camera.Camera instances
+    
+    Returns
+    -------
+    cam3d_matches : pd.DataFrame
+        Dataframe with 3d positions projected from the 2d correspondences.
+        With columns :code:`frame, c1_oid, c2_oid, x, y, z`
+    
+    See Also
+    --------
+    match2d.generate_2d_correspondences
+    projection.triangulate_points_in3D
+    '''
+    # need to compare the row values as STRINGS - and not as integers/floats
+    threed_positions = []
+    for i, (frame, c1oid, c2oid) in matches_2d.iterrows():
+        cam1_rowmatch = np.logical_and(cam1_2dpoints['frame']==float(frame),
+                                       cam1_2dpoints['oid'].astype('str')==c1oid)
+        cam2_rowmatch = np.logical_and(cam2_2dpoints['frame']==float(frame),
+                                       cam2_2dpoints['oid'].astype('str')==c2oid)
+        if np.logical_or(np.sum(cam1_rowmatch)==0, np.sum(cam2_rowmatch)==0):
+            threed_positions.append([np.nan]*3)
+        else:
+        
+            c1_point_xy = cam1_2dpoints[cam1_rowmatch].loc[:,['x','y']].to_numpy(dtype='float32')
+            c2_point_xy = cam2_2dpoints[cam2_rowmatch].loc[:,['x','y']].to_numpy(dtype='float32')
+            XYZ = triangulate_points_in3D(c1_point_xy, c2_point_xy, camera1, camera2)
+            threed_positions.append(XYZ)
+    positions3d_df = pd.DataFrame(threed_positions)
+    
+    cam3d_matches = matches_2d.copy()
+    cam3d_matches['x'] = positions3d_df.loc[:,0]
+    cam3d_matches['y'] = positions3d_df.loc[:,1]
+    cam3d_matches['z'] = positions3d_df.loc[:,2]
+    return cam3d_matches
 
 
 

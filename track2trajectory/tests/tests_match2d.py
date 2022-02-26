@@ -86,10 +86,12 @@ class CheckGenerate2DCorrespondences(unittest.TestCase):
         self.cam1, self.cam2 = syndata.generate_two_synthetic_cameras_version2()
         num_particles = 15
         num_frames = 20
+        volume_limits = [[-5,5],
+                         [7,10],
+                         [-1,1]]
         points_in_3d = syndata.make_brownian_particles(num_particles,
-                                                        [[-5,5],
-                                                            [7,10],
-                                                            [-1,1]], frames=num_frames,
+                                                       volume_limits,
+                                                       frames=num_frames,
                                                         stepsize=0.2)
 
         self.all_2dpoints = self.make_2dprojection_data(self.cam1, self.cam2, points_in_3d)
@@ -99,7 +101,7 @@ class CheckGenerate2DCorrespondences(unittest.TestCase):
         # alter the camera 2 oids just to check that it's not specific to a numerical oid
         oid_replacement_dict = {each: string.ascii_lowercase[each]  for each in range(num_particles)}
         self.cam2_2dpoints['oid'] = self.cam2_2dpoints['oid'].replace(oid_replacement_dict)
-        
+
     def make_2dprojection_data(self, cam1, cam2, points_in_3d):
         
         cam1_2dpoints, cam1_fails = project_to_2d_and_3d(points_in_3d,
@@ -130,6 +132,15 @@ class CheckGenerate2DCorrespondences(unittest.TestCase):
                                                               self.cam1_2dpoints,
                                                               cam2_woframe2,
                                                               self.F)
+
+class TestGenerate2DCorrespondences(unittest.TestCase):
+    '''
+    '''
+    
+    def test_mock(self):
+        raise NotImplementedError('Correctness test for Generate2D correspondences\
+                                  not implemented')
+
 
 
 if __name__ == '__main__':
