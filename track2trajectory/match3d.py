@@ -29,16 +29,17 @@ def match_2dpoints_to_3dtrajectories(camera1, camera2, cam1_2dpoints, cam2_2dpoi
         data for each camera.
     fundamental_matrix : (3,3) np.array
         Fundamental matrix which maps points from cam1 to cam2.
+    do_kalman_filtering : bool
     
+
     Returns 
     -------
     matched_trajectories : pd.DataFrame
         With columns :code:`frame,traj_id, x, y, z, c1_oid, c2_oid`
-    
+
     See Also
     --------
     projection.generate_2d_correspondences
-    
     
     '''
     twocam_matches, failed_2dmatches = generate_2d_correspondences(camera1, camera2,
