@@ -48,12 +48,15 @@ def match_2dpoints_to_3dtrajectories(camera1, camera2, cam1_2dpoints, cam2_2dpoi
                                                        fundamental_matrix,
                                                        **kwargs)    
     # Generate 3D projections of all matched points
-    matched_xyz = get_3d_positions_from2dmatches(twocam_matches, camera1, camera2)
+    matched_xyz = get_3d_positions_from2dmatches(twocam_matches,cam1_2dpoints,
+                                                 cam2_2dpoints, camera1, camera2)
 
     # Form heuristic trajectory labels based on co-occurence of 2d point labels
     
     # Run Kalman filtering if required to test correspondence matches and 
     # fill in the gaps 
+    
+    return matched_xyz 
     
     
 

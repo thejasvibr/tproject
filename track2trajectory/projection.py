@@ -8,6 +8,7 @@ import numpy as np
 import cv2
 import pandas as pd
 import track2trajectory.camera as camera
+from track2trajectory.helper import make_homog
 
 def calcFundamentalMatrix(camera_1, camera_2):
     '''
@@ -53,7 +54,7 @@ def calcFundamentalMatrix(camera_1, camera_2):
     p4 = camera_1.cm_mtrx[:,-1]
     # Calculating camera centre C on page 158
     C_inhomog = -np.matmul(np.linalg.inv(M),p4)
-    C = np.concatenate((C_inhomog, np.array([1]))).flatten() # make homogeneous
+    C = make_homog(C_inhomog) # make homogeneous
 
     P_prime = camera_2.cm_mtrx
     e_prime = np.matmul(P_prime, C)

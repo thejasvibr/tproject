@@ -31,7 +31,8 @@ release = '0.0.0'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', 'sphinx.ext.napoleon',
-				'sphinx.ext.viewcode','recommonmark','sphinx.ext.mathjax']
+				'sphinx.ext.viewcode','recommonmark','sphinx.ext.mathjax',
+				'sphinx_gallery.gen_gallery']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -63,3 +64,17 @@ autodoc_member_order = 'bysource'
 
 # also document the __init__ of classes
 autodoc_special_members = ['__init__']
+
+
+# MOCK THE INSTALLATION OF THESE PACKAGES  becaue RTD doesn't allow C packages
+autodoc_mock_imports = ["cv2"]
+
+
+# sphinx gallery
+from sphinx_gallery.sorting import FileNameSortKey
+sphinx_gallery_conf = {
+     'gallery_dirs' : ['gallery_examples'],
+     'examples_dirs': ['../../examples'],  # path to where to save gallery generated output
+	 'image_scrapers': ('matplotlib'),
+	 'within_subsection_order': FileNameSortKey
+						}

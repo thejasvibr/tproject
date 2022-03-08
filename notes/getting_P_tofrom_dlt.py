@@ -17,6 +17,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial import distance, distance_matrix
 from scipy.spatial.transform import Rotation
 from track2trajectory.synthetic_data import get_cam_centre_from_projectionmat
+from track2trajectory.synthetic_data import make_rotation_mat_fromworld
 #%% The 12 DLT coefficients are part of a 3x4 matrix, where the last entry 
 # DLT[4,4] is a scaling factor. The coefficients are laid out so
 #::
@@ -57,18 +58,20 @@ for (row,col) in ([0,0],[1,1],[2,2]):
 # Let's first create the simplest possible situation, where the camera is at the 
 # origin and translated by 10 units in x and y Cworld = [10, 10, 0]
 Cworld = np.array([10, 10, 1])
-T = np.concatenate((-Cworld, np.array([1])))
+#T = np.concatenate((Cworld, np.array([1])))
 R = Rotation.from_euler('xyz', [5,10,5],degrees=True).as_matrix()
-
+Rc = make_rotation_mat_fromworld(R, Cworld)
 
 P = np.zeros((4,4))
-P[:,-1] = T
-P[:3,:3] = R
+#P[:,-1] = T
+P[:,:] = Rc
 
 #%% get the DLT coefficients
 dlt = np.matmul(np.matmul(K,m),P)
 
 #%% Now from the dlt, let's try to get the P matrix back.
+# DLT = K m P 
+
 Km = np.matmul(K,m)
 
 Psim_est, residual, _ ,_ = np.linalg.lstsq(Km, dlt)
@@ -95,6 +98,7 @@ def assign_coefs_rowwise(coefs):
                 k+=1
             else:
                 pass
+    dlt_mat[-1,-1] = 0
     return dlt_mat
 # Cam1
 dlt_teax_c1 = assign_coefs_rowwise(c1_dlt)
@@ -113,6 +117,8 @@ dlt_teax_c3 = assign_coefs_rowwise(c3_dlt)
 Pest_cam3, res, _, _= np.linalg.lstsq(Km_teax, dlt_teax_c3)
 R_cam3 = Pest_cam3[:3,:3]
 
+for fname, matrix in zip(['Pestcam1', 'Pestcam2','Pestcam3'],[Pest_cam1, Pest_cam2, Pest_cam3]):
+    np.savetxt(fname+'.csv', matrix, delimiter=',')
 
 #%% 
 cam1_centre = get_cam_centre_from_projectionmat(Pest_cam1)

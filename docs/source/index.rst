@@ -6,6 +6,14 @@
 track2trajectory: Matching 2D tracks to 3D trajectories
 =======================================================
 
+
+
+toctree::
+      :maxdepth: 4
+      :caption: Use Cases
+
+      gallery_examples/index.rst
+
 This is a work under progress...a skeleton online docs page.
 
 What this package does
@@ -44,10 +52,6 @@ Let's take a look at a quick mock example:
 
    # having loaded the xy data for both cameras now begin the matching
    matched_trajectories = estimate_3d_points(cam1, cam2, bothcamera_2d_tracks, ...)
-
-
-
-
 
 
 
