@@ -7,9 +7,11 @@
 import cv2
 import numpy as np 
 import pandas as pd
+from scipy.spatial import distance
 import track2trajectory
 import track2trajectory.camera as camera
 from track2trajectory import get_closest_points
+from track2trajectory.projection import triangulate_points_in3D, project_to_2d
 import tqdm
 make_homog = track2trajectory.make_homog
 
@@ -21,6 +23,12 @@ def generate_2d_correspondences(camera1, camera2, cam1_2dpoints, cam2_2dpoints,
     the epipolar is projected back onto Cam1. If there are >1 Cam1 points close to the line
     then the candidate is discarded. If there is only one candidate close the epipolar
     on Cam1 and it matches the source point - then it is considered a reliable correspondence.
+
+    TODO
+    ----
+    * implement the fundamental matrix based distance. This method checks
+    the residual in the x'Fx . In the ideal case, the product should be 0, 
+    otherwise - the best correspondence will still give the lowest value.
 
     Parameters
     ----------
@@ -47,8 +55,8 @@ def generate_2d_correspondences(camera1, camera2, cam1_2dpoints, cam2_2dpoints,
     References
     ----------
     * Tandogan, Giray, 2022, 3D Trajectory Reconstruction for Animal Data, Master's
-    thesis (Uni. Konstanzt), page 9
-       
+    thesis (Uni. Konstanz), page 9
+
     See Also
     --------
     projection.calcFundamentalMatrix
@@ -56,9 +64,10 @@ def generate_2d_correspondences(camera1, camera2, cam1_2dpoints, cam2_2dpoints,
     helper.get_closest_points
                                            
     '''
+    backpred_tol = kwargs.get('backpred_tol', 10) # backprediction tolerance
     failed_matches_cam1 = 0
     correspondences = {}
-    for rownum in tqdm.trange(cam1_2dpoints.shape[0]):
+    for rownum in tqdm.tqdm(list(cam1_2dpoints.index)):
         framenum = cam1_2dpoints.loc[rownum,'frame']
         
         at_frame_c1 = cam1_2dpoints[cam1_2dpoints['frame']==framenum]
@@ -71,16 +80,21 @@ def generate_2d_correspondences(camera1, camera2, cam1_2dpoints, cam2_2dpoints,
         c1oid = at_frame_c1.loc[rownum,['oid']].tolist()[0]
         # For each point on Cam1 - try to find corresponding point on cam2 with 2wayprojection
         cam2_best_points = find_candidates(at_frame_c2, fundamental_matrix,
-                                           camera2, camera1, source_point, **kwargs)
+                                           camera1, camera2, source_point, **kwargs)
+        print(f'frame: {framenum} rownum:{rownum},\
+              {c1oid},{source_point}\
+              Cam2 best points: {cam2_best_points}')
         # If a single point on Cam2 is found then great, else leave this for now 
         # (and store the possible candidates?)
         if not len(cam2_best_points)==1:
+            print(f'cam2 candidates neq 1: {cam2_best_points}')
             failed_matches_cam1 += 1 
         else:
             cam1_2way_points = find_candidates(at_frame_c1, fundamental_matrix,
                                            camera2, camera1, cam2_best_points[0],
                                                                **kwargs)
             if len(cam1_2way_points)!=1:
+                print(f'cam1-2way neq 1: {cam1_2way_points}')
                 correspondences[f'frame_{framenum}_c1_oid_{c1oid}'] = f'{np.nan}'
                 same_point_check = False
                 failed_matches_cam1 += 1 
@@ -88,15 +102,25 @@ def generate_2d_correspondences(camera1, camera2, cam1_2dpoints, cam2_2dpoints,
                 # check that cam1_2way_points is the same as the source point
                 same_point_check = np.allclose(source_point,
                                                cam1_2way_points.flatten(),
-                                               atol=1e-6)
+                                               atol=backpred_tol)
+                if not same_point_check:
+                    print(f'back-match not close enough, {cam1_2way_points}')
 
+            print(f'Cam2 best: {cam2_best_points[0][0],cam2_best_points[0][1]} \n')
+            
             if same_point_check:
+                x0, y0 = cam2_best_points[0][0], cam2_best_points[0][1]
                 # get object ID of the cam 2 point
-                same_x = at_frame_c2['x']==cam2_best_points[0][0]
-                same_y = at_frame_c2['y']==cam2_best_points[0][1]
-                cam2_on_frame_row = at_frame_c2[np.logical_and(same_x, same_y)]
-                c2oid = cam2_on_frame_row['oid'].tolist()[0]
-                correspondences[f'frame_{framenum}_c1_oid_{c1oid}'] = f'c2_oid_{c2oid}'
+                same_x = at_frame_c2['x'].sub(x0).abs().idxmin()
+                same_y = at_frame_c2['y'].sub(y0).abs().idxmin()
+                if same_x==same_y:
+                    cam2_on_frame_row = at_frame_c2.loc[same_x,:]
+                    c2oid = cam2_on_frame_row['oid']
+                    correspondences[f'frame_{framenum}_c1_oid_{c1oid}'] = f'c2_oid_{c2oid}'
+                else:
+                    raise ValueError(f'wtf :{same_x, same_y, at_frame_c2}')
+            else:
+                failed_matches_cam1 += 1
 
     correspondece_data = pd.DataFrame(columns=['frame','c1_oid','c2_oid'], 
                                       index=np.arange(len(correspondences)))
@@ -115,12 +139,7 @@ def generate_2d_correspondences(camera1, camera2, cam1_2dpoints, cam2_2dpoints,
 def find_candidates(all_2d_points_camera2, fund_matrix, camera1: camera.Camera,
                    camera2: camera.Camera, source_point, **kwargs):
     '''
-   Gives the 2D points closest to the epipolar line drawn on camera 2. The epipolar
-   line is derived from the candidate point on camera 1. 
-
-    If there are >1 points that are similarly close to the epipolar line, then 
-    multiple candidates are returned.
-
+   
    Parameters
    ----------
    all_2d_points : pd.DataFrame
@@ -137,7 +156,9 @@ def find_candidates(all_2d_points_camera2, fund_matrix, camera1: camera.Camera,
        This means if distances are [0.1, 1, 2, 0.11, 0.105], then all 
        distances <= :math:`minimum_value \times (1+rel_threshold)` will be 
        considered close.
-
+   match_method : str
+       One of ('epipolar', 'fundmat')
+    
    Returns 
    -------
    closest_points : (N,2) np.array
@@ -152,6 +173,31 @@ def find_candidates(all_2d_points_camera2, fund_matrix, camera1: camera.Camera,
    -----
    This if the refactored version of the original find_candidate
     '''
+    match_method = kwargs.get('match_method', 'epipolar')
+    if match_method == 'epipolar':
+        closest_points  = find_candidates_epipolar(all_2d_points_camera2,
+                                                  fund_matrix, camera1,
+                                                  camera2, source_point,
+                                                  **kwargs)
+    elif match_method == 'fundmat':
+        closest_points  = find_candidates_fundmat(all_2d_points_camera2, fund_matrix,
+                                                  camera1, camera2,
+                                                  source_point, **kwargs)
+    elif match_method == '3dbackpred':
+        closest_points = find_candidates_backproj(all_2d_points_camera2, 
+                                                  fund_matrix,
+                                                  camera1,
+                                                  camera2,
+                                                  source_point, **kwargs)
+    else: 
+        raise ValueError(f'Given match method {match_method} is invalid.\
+                         The only valid match methods are epipolar or fundmat')
+    return closest_points
+        
+def get_epiline(all_2d_points_camera2, fund_matrix,
+                camera1, camera2, source_point):
+    '''
+    '''
     # Set camera ids for computeCorrespondEpilines()
     if camera1.id < camera2.id:
         cid = 1
@@ -164,18 +210,79 @@ def find_candidates(all_2d_points_camera2, fund_matrix, camera1: camera.Camera,
     # Get epiline from cam1 to cam2
     epilines = cv2.computeCorrespondEpilines(source_point.reshape(-1,2),
                                              cid, np.float32(fund_matrix))
-    points_xy = all_2d_points_camera2.loc[:,['x','y']].to_numpy(dtype='float32')    
-    a,b,c = epilines[0][0]
+    return epilines
+        
+def find_candidates_epipolar(all_2d_points_camera2, fund_matrix,camera1: camera.Camera,
+                   camera2: camera.Camera, source_point, **kwargs):
+    '''
+    Gives the 2D points closest to the epipolar line drawn on camera 2. The epipolar
+    line is derived from the candidate point on camera 1. 
 
+     If there are >1 points that are similarly close to the epipolar line, then 
+     multiple candidates are returned.
+
+    '''
+    epilines = get_epiline(all_2d_points_camera2, fund_matrix,
+                           camera1, camera2, source_point)
+    a,b,c = epilines[0][0]
+    points_xy = all_2d_points_camera2.loc[:,['x','y']].to_numpy(dtype='float32')    
     # if point lies close the line the ax+by+c will be close to 0
     # if it lies on the line, then the sum will be 0
     distances = []
     for each in points_xy:
         x,y = each
         distances.append(abs(a*x+b*y+c))
-
     closest_points = get_closest_points(points_xy, distances, **kwargs)
+    return closest_points 
+    
+
+def find_candidates_fundmat(all_2d_points_camera2, fund_matrix,camera1: camera.Camera,
+                   camera2: camera.Camera, source_point, **kwargs):
+    '''
+    Uses the residual in the x'Fx relation to detect the best correspondence
+    between points. 
+    
+    References
+    ----------
+    * Hartley & Zisserman, page 246
+    
+    '''
+    xy_pts_cam2 = all_2d_points_camera2.loc[:,['x','y']].to_numpy(dtype=np.float32)
+    residuals = []
+    for each_pt in xy_pts_cam2:
+        residual = check_xprimeFx(fund_matrix, source_point, each_pt, camera1, camera2)
+        residuals.append(residual)
+    closest_points = get_closest_points(xy_pts_cam2, residuals, **kwargs)
     return closest_points
+    
+
+def find_candidates_backproj(all_2d_points_camera2, fund_matrix,camera1: camera.Camera,
+                   camera2: camera.Camera, source_point, **kwargs):
+    '''
+    camera1 is the 'source' camera where the source point is located
+    
+    A 3D point is generated first
+    '''
+    backpred_tol = kwargs.get('backpred_tol', 10)
+    xy_pts_cam2 = all_2d_points_camera2.loc[:,['x','y']].to_numpy(dtype=np.float32)
+    all_distances = []
+    for each_cam2 in xy_pts_cam2:
+        threedpoint = triangulate_points_in3D(source_point, each_cam2,
+                                              camera1, camera2)
+        xy_proj, failed = project_to_2d(threedpoint, camera1)
+        if failed:
+            all_distances.append(np.nan)
+            continue
+        # check that the 2D projection matches the source 2D point
+        if np.allclose(xy_proj, source_point, atol=backpred_tol):
+            proj_distance = distance.euclidean(xy_proj, source_point)
+            all_distances.append(proj_distance)
+        else:
+            all_distances.append(np.nan)
+    closest_points = get_closest_points(xy_pts_cam2, all_distances, **kwargs)
+    return closest_points
+    
+        
 
 
 def check_xprimeFx(F,x, xprime, camera1, camera2):

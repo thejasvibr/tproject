@@ -34,10 +34,10 @@ def get_closest_points(points2d, distances, **kwargs):
     distances = np.array(distances)
     if not np.logical_and(rel_threshold > 0, rel_threshold<=1):
         raise ValueError(f'Relative threshold must be >0 and <= 1: {rel_threshold}')
-    if np.min(distances) ==0:
+    if np.nanmin(distances) ==0:
         small_distances = np.argwhere(distances==0).flatten()
     else:
-        normalised_distances = distances/np.min(distances)
+        normalised_distances = distances/np.nanmin(distances)
         # distances considered close
         small_distances = np.argwhere(normalised_distances <= 1+rel_threshold).flatten()
     # print(f'points with low distance: {small_distances}')

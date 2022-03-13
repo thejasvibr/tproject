@@ -2,11 +2,13 @@
 """
 Quick run through example
 =========================
+This example will show the basic commands required to run the 2d trajectory 
+matching and 3D position triangulation.
 
 """
 import uuid
-import matplotlib.pyplot as plt 
-import numpy as np 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from track2trajectory.synthetic_data import generate_two_synthetic_cameras_version2
 from track2trajectory.synthetic_data import make_brownian_particles
@@ -39,6 +41,8 @@ cam2_2dpoints, cam2_fails = project_to_2d_and_3d(xyz_particles, cam2)
 new_codes = [str(uuid.uuid4())[-4:] for each in range(num_particles)]
 replacement = { each:new_codes[i]  for i,each in enumerate(cam2_2dpoints['oid'].unique())}
 cam2_2dpoints['oid'] = cam2_2dpoints['oid'].replace(replacement)
+
+cam2_2dpoints
 #%% 
 # Running trajectory matching
 # ---------------------------

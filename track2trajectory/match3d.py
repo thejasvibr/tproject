@@ -15,7 +15,7 @@ import tqdm
 import datetime as dt
 from track2trajectory.prediction import kalman_predict
 from track2trajectory.projection import triangulate_points_in3D
-from track2trajectory.match2d import generate_2d_correspondences
+from track2trajectory.match2d import generate_2d_correspondences, find_candidates
 
 
 def match_2dpoints_to_3dtrajectories(camera1, camera2, cam1_2dpoints, cam2_2dpoints,
@@ -94,12 +94,15 @@ def get_3d_positions_from2dmatches(matches_2d, cam1_2dpoints, cam2_2dpoints, cam
             c2_point_xy = cam2_2dpoints[cam2_rowmatch].loc[:,['x','y']].to_numpy(dtype='float32')
             XYZ = triangulate_points_in3D(c1_point_xy, c2_point_xy, camera1, camera2)
             threed_positions.append(XYZ)
-    positions3d_df = pd.DataFrame(threed_positions)
-    
-    cam3d_matches = matches_2d.copy()
-    cam3d_matches['x'] = positions3d_df.loc[:,0]
-    cam3d_matches['y'] = positions3d_df.loc[:,1]
-    cam3d_matches['z'] = positions3d_df.loc[:,2]
+    if len(threed_positions)>0:
+        positions3d_df = pd.DataFrame(threed_positions)
+        
+        cam3d_matches = matches_2d.copy()
+        cam3d_matches['x'] = positions3d_df.loc[:,0]
+        cam3d_matches['y'] = positions3d_df.loc[:,1]
+        cam3d_matches['z'] = positions3d_df.loc[:,2]
+    else:
+        cam3d_matches = pd.DataFrame()
     return cam3d_matches
 
 

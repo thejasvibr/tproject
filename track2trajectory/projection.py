@@ -46,8 +46,8 @@ def calcFundamentalMatrix(camera_1, camera_2):
     --------
     make_skew_symmetric_matrix
     '''
-    if not camera_1.id < camera_2.id:
-        ValueError(f'Camera 1 ID: {camera_1.id} is > Camera 2 ID: {camera_2.id}.\
+    if camera_2.id < camera_1.id:
+        raise ValueError(f'Camera 1 ID: {camera_1.id} is > Camera 2 ID: {camera_2.id}.\
                    For calcFundamentalMatrix Camera 1 ID must be < Camera 2 ID')
     # M is defined on pg 161 as 'the first 3x3 submatrix of P'
     M = camera_1.cm_mtrx[:3,:3]
@@ -210,3 +210,43 @@ def make_skew_symmetric_matrix(a):
                     [a3, 0, -a1],
                     [-a2, a1, 0]), dtype=np.float32)
     return a_x
+
+
+def project_to_2d(XYZ, cam):
+    '''
+    '''
+    t_mat = np.zeros((4,4))
+    t_mat[:3,:3] = cam.r_mtrx
+    t_mat[:3,-1] = cam.t_mtrx
+    t_mat[-1,-1] = 1
+    
+    XZY = [XYZ[i] for i in [0,2,1]] # change order of xyz to xzy
+    XZY_homog = np.append(XZY,1)
+    pixels = cam_pixel_coods(cam.i_mtrx, t_mat, XZY_homog)
+    if np.sum(np.isnan(pixels))>0:
+        return pixels, True
+    else:
+        return pixels, False
+    
+
+def cam_pixel_coods(intrinsic_mat, T_mat, XYZ):
+    '''
+    Parameters
+    ----------
+    intrinsic_mat : (3,3) np.array
+        fx 0 cx
+        0 fy cy
+        0 0 1
+    T_mat : (4,4) np.array
+        [r11 r22 r33 t1]
+        [r21 r22 r23 t2]
+        [r31 r32 r33 t3]
+        [0    0   0  1]
+    XYZ : (1,3) or (3,) np.array
+    
+    '''
+    K_T = np.matmul(intrinsic_mat, T_mat[:3,:])
+    K_R_xyz = np.matmul(K_T, XYZ)
+    pixels = K_R_xyz[:-1]/K_R_xyz[-1]
+    return pixels
+
