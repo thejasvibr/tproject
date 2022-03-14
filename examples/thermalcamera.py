@@ -232,7 +232,7 @@ ax3.plot(xyz_P_based[:,0], xyz_P_based[:,2], xyz_P_based[:,1], '*')
 
 plt.savefig('../docs/source/_static/threed_coordinates.png')
 #%%
-#.. image:: ../_static//threed_coordinates.png
+#.. image:: ../_static/threed_coordinates.png
 #  :width: 400
 
 #%% 
@@ -259,7 +259,6 @@ Ccam2_Pmethod = get_cam_centre_from_projectionmat(Pcam2)
 intercam_dist_P = distance.euclidean(Ccam1_Pmethod, Ccam2_Pmethod)
 
 print(f'Inter-camera centre distance: \n Projection mat: {intercam_dist_P}\n DLT method: {intercam_dist_dlt}')
-
 
 #%% 
 # Get the overall accelaration. This is a falling object, and so the only
@@ -290,7 +289,7 @@ plt.legend();plt.ylim(8,10.5)
 
 plt.savefig('../docs/source/_static/g_acc.png')
 #%%
-#.. image:: ../_static//g_acc.png
+#.. image:: ../_static/g_acc.png
 #  :width: 400
 
 #%%
