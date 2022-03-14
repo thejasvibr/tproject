@@ -29,7 +29,7 @@ from track2trajectory.dlt_to_world import transformation_matrix_from_dlt, cam_ce
 import mat73
 from scipy.spatial import distance
 from gravity_alignment import smooth_and_acc, row_calc_norm
-
+# sphinx_gallery_thumbnail_path = '_static//threed_coordinates.png'
 concat = np.concatenate
 
 def point2point_matrix(xyz):

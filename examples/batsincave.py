@@ -17,6 +17,8 @@ from track2trajectory.projection import project_to_2d
 from track2trajectory.synthetic_data import make_rotation_mat_fromworld, get_cam_coods
 from track2trajectory.dlt_to_world import transformation_matrix_from_dlt, cam_centre_from_dlt
 
+# sphinx_gallery_thumbnail_path = '_static/bats3dtraj.png'
+
 threecam_xy = pd.read_csv('DLTdv8_data_p000_15000_3camxypts.csv')
 
 def reformat_dltdv_frame(dltdv_df, camname, camnum):
