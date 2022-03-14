@@ -1,3 +1,4 @@
+matplotlib
 recommonmark 
 sphinx==4.4.0
 sphinx_gallery==0.8.2
