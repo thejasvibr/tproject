@@ -55,9 +55,11 @@ Let's take a look at a quick mock example:
 
 Conception and history
 ----------------------
-The original code and research for this project was written by Giray Tandogan as part of a Bachelor's Thesis at the University of Konstanz. The project was supervised by Hemal Naik, and Thejasvi Beleyur. Thejasvi Beleyur is currently working
-on refactoring Giray's code to make it into an installable package of general interest.
+The original code and research for this project was written by Giray Tandogan as part of a Masters Thesis at the University of Konstanz. The project was supervised by Hemal Naik, and Thejasvi Beleyur. Thejasvi Beleyur is currently working on refactoring Giray's code to make it into an installable package of general interest.
 
+Funding
+-------
+TB was funded during the writing of this package by a Medium grant awarded by the Centre for the Advanced Study of Collective Behaviour, University of Konstanz. 
 
 Code docs
 =========

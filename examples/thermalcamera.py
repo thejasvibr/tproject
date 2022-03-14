@@ -101,6 +101,11 @@ plt.plot(cam3_undist[:,:,0], cam3_undist[:,:,1],'^')
 plt.ylim(0,512)
 plt.xlim(0,640)
 
+plt.savefig('../docs/source/_static/undistorted_cameracoods.png')
+#%%
+#.. image:: ../_static//undistorted_cameracoods.png
+#  :width: 400
+
 #%%
 # DLT reconstruction using 11 parameter DLT from easyWand
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -225,6 +230,11 @@ ax3 = plt.subplot(313, projection='3d')
 ax3.view_init(azim=95, elev=-54)
 ax3.plot(xyz_P_based[:,0], xyz_P_based[:,2], xyz_P_based[:,1], '*')
 
+plt.savefig('../docs/source/_static/threed_coordinates.png')
+#%%
+#.. image:: ../_static//threed_coordinates.png
+#  :width: 400
+
 #%% 
 # How similar or dissilimar are the points. They may have different origins and 
 # axis orientations - but the euclidean distances between points should remain 
@@ -277,6 +287,11 @@ plt.plot(row_calc_norm(acc_P), '^', label='Projection matrix based')
 plt.plot(row_calc_norm(acc_tmat), label='projection from T matrix')
 plt.hlines(9.8, 0,10,'k', label='g=9.81 $m/s^{2}$')
 plt.legend();plt.ylim(8,10.5)
+
+plt.savefig('../docs/source/_static/g_acc.png')
+#%%
+#.. image:: ../_static//g_acc.png
+#  :width: 400
 
 #%%
 get_range = lambda X: np.max(X) - np.min(X)

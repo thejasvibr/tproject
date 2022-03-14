@@ -139,7 +139,7 @@ df = pd.read_csv('DLTdv8_data_p000_15000_3camxyzpts.csv')
 pt3d_bycam = threed_matches.groupby('c1_oid')
 plt.figure()
 a0 = plt.subplot(111 ,projection='3d')
-a0.view_init(azim=112, elev=12)
+a0.view_init(azim=108, elev=21)
 for names in ['cam1-pt1', 'cam1-pt2', 'cam1-pt3']:
     p1 = pt3d_bycam.get_group(names)   
     plt.plot(p1['x'],p1['z'],p1['y'],'-.',label=names)
@@ -148,3 +148,8 @@ for i,each in enumerate([cam1C, cam2C, cam3C]):
     a,b,c = each
     plt.plot(a,b,c,'^',label='cam'+str(i))
 plt.legend()
+
+plt.savefig('../docs/source/_static/bats3dtraj.png')
+#%%
+#.. image:: ../_static/bats3dtraj.png
+#  :width: 400

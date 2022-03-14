@@ -5,6 +5,7 @@ Quick run through example
 This example will show the basic commands required to run the 2d trajectory 
 matching and 3D position triangulation.
 
+Author: Thejasvi Beleyur, March 2022
 """
 import uuid
 import matplotlib.pyplot as plt
@@ -20,7 +21,6 @@ from track2trajectory.match3d import match_2dpoints_to_3dtrajectories
 # Let's first generate 1) 2 cameras located at `xyz` [-1,0,0] and [1,0,0].
 # and 2) calculate the fundmental matrix mapping points between the two cameras.
 cam1, cam2 = generate_two_synthetic_cameras_version2()
-
 F = calcFundamentalMatrix(cam1, cam2)
 
 #%% Now let's proceed to synthesize a few particles moving around in front of the 
@@ -54,5 +54,5 @@ threed_matches = match_2dpoints_to_3dtrajectories(cam1, cam2,
                                                   cam1_2dpoints,
                                                   cam2_2dpoints, F)
 
-
+threed_matches
 
