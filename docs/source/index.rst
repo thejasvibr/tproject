@@ -61,14 +61,12 @@ Funding
 -------
 TB was funded during the writing of this package by a Medium grant awarded by the Centre for the Advanced Study of Collective Behaviour, University of Konstanz. 
 
-Code docs
-=========
-
 .. toctree::
-   :maxdepth:1
-   :caption: API reference:
+      :maxdepth:1
+      :caption: API reference:
 
-   API_track2trajectory.rst
+      API_track2trajectory.rst
+
 
 Indices and tables
 ==================
