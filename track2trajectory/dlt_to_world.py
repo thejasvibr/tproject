@@ -133,13 +133,17 @@ def dlt_inverse(c, xyz):
     -------
     uv : (nframes,2) np.array
         row and col pixels across frames
+        
+    Notes
+    -----
+    Most probably taken from http://www.kwon3d.com/theory/dlt/dlt.html#2d
     '''
     nrows = xyz.shape[0]
     
     uv = np.empty((nrows,2))
     uv[:,:] = np.nan
     uv_col0_numerator = xyz[:,0]*c[0] + xyz[:,1]*c[1] + xyz[:,2]*c[2] + c[3]
-    uv_col0_denom = xyz[:,0]*c[8]+xyz[:,1]*c[9]+xyz[:,2]*c[10]+1
+    uv_col0_denom = xyz[:,0]*c[8] + xyz[:,1]*c[9] + xyz[:,2]*c[10] + 1
     uv[:,0] = uv_col0_numerator/uv_col0_denom
     
     uv_col1_num = xyz[:,0]*c[4]+xyz[:,1]*c[5]+xyz[:,2]*c[6]+c[7]
@@ -199,6 +203,40 @@ def partialdlt(u,v,C1, C2):
     return m, b
     
 
+def dlt_reconstruct_v2(c, camPts):
+    '''
+    Python port of the same MATLAB function by Ty Hedrick from DLTdv7
+    Small difference is that the camera points are only from one frame,
+    and no rmse is given. 
+    
+    Parameters
+    ----------
+    c : (11, Ncam) np.array
+        DLT coefficients for each camera in column-wise fashions
+    camPts : (2*Ncam) np.array
+        All the row, col coordinates of detected objects. 
 
-
+    Returns 
+    -------
+    
+        
+    
+    '''
+    nCams = int(camPts.size/2)
+    m1 = np.zeros((2*nCams, 3))
+    m2 = np.zeros(((2*nCams, 1)))
+    first_rows = np.arange(0,nCams*2,2)
+    second_rows = np.arange(1,nCams*2+1,2)
+    m1[first_rows,  0] = camPts[0::2]*c[8,:]-c[0,:]
+    m1[first_rows,  1] = camPts[0::2]*c[9,:]-c[1,:]
+    m1[first_rows,  2] = camPts[0::2]*c[10,:]-c[2,:]
+    m1[second_rows, 0] = camPts[1::2]*c[8,:]-c[4,:]
+    m1[second_rows, 1] = camPts[1::2]*c[9,:]-c[5,:]
+    m1[second_rows, 2] = camPts[1::2]*c[10,:]-c[6,:]
+    
+    m2[first_rows,0] = c[3,:] - camPts[0::2]
+    m2[second_rows,0] = c[7,:] - camPts[1::2]
+    
+    xyz, resid, _, _ = np.linalg.lstsq(m1, m2, rcond=None)
+    return xyz
 

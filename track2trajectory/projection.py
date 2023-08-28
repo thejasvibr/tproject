@@ -27,6 +27,9 @@ def calcFundamentalMatrix(camera_1, camera_2):
     Parameters
     ----------
     camera_1, camera_2 : camera.Camera instances 
+        Both cameras should have a ```cm_mtrx``` attribute which 
+        is a 3x4 Camera matrix. The first left 3x3 submatrix is the rotation 
+        matrix, and the last 3x1 submatrix is the translation.
 
     Returns
     -------
@@ -166,6 +169,8 @@ def triangulate_points_in3D(point1, point2, camera1, camera2):
     ----------
     point1, point2 : (2,) np.array with np.float32 entries
     camera1, camera2 : camera.Camera instances
+        With cm_mtrx attribute. The cm_mtrx is the 
+        3x4 camera matrix.
     
     Returns
     -------
@@ -214,6 +219,17 @@ def make_skew_symmetric_matrix(a):
 
 def project_to_2d(XYZ, cam):
     '''
+    XYZ : np.array 
+        POsition of the object
+    cam : camera.Camera class instance
+        Must have attributes i_mtrx, r_mtrx
+    
+    Returns 
+    -------
+    pixels : np.array
+        2D location of object on camera
+    bool
+        Whether there is a solution or not.
     '''
     t_mat = np.zeros((4,4))
     t_mat[:3,:3] = cam.r_mtrx
